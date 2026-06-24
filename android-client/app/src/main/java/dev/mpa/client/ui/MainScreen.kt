@@ -1,0 +1,264 @@
+package dev.mpa.client.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import dev.mpa.client.MainUiState
+import dev.mpa.client.data.ConnectionStatus
+import dev.mpa.client.ui.components.AddServerDialog
+import dev.mpa.client.ui.components.AnimatedBackground
+import dev.mpa.client.ui.components.ConnectButton
+import dev.mpa.client.ui.components.ServerCard
+import dev.mpa.client.ui.theme.Accent
+import dev.mpa.client.ui.theme.AccentSoft
+import dev.mpa.client.ui.theme.Border
+import dev.mpa.client.ui.theme.Connected
+import dev.mpa.client.ui.theme.ConnectedSoft
+import dev.mpa.client.ui.theme.Error
+import dev.mpa.client.ui.theme.ErrorSoft
+import dev.mpa.client.ui.theme.Ink
+import dev.mpa.client.ui.theme.SpaceGroteskFamily
+import dev.mpa.client.ui.theme.Surface
+import dev.mpa.client.ui.theme.TextMuted
+import dev.mpa.client.ui.theme.TextPrimary
+
+private data class StatusPill(
+    val label: String,
+    val bg: androidx.compose.ui.graphics.Color,
+    val fg: androidx.compose.ui.graphics.Color,
+)
+
+private fun statusPill(status: ConnectionStatus) = when (status) {
+    is ConnectionStatus.Disconnected  -> StatusPill("Отключено",      Surface,       TextMuted)
+    is ConnectionStatus.Connecting    -> StatusPill("Подключение...", AccentSoft,    Accent)
+    is ConnectionStatus.Connected     -> StatusPill("Подключено",     ConnectedSoft, Connected)
+    is ConnectionStatus.Disconnecting -> StatusPill("Отключение...", AccentSoft,    Accent)
+    is ConnectionStatus.Error         -> StatusPill("Ошибка",         ErrorSoft,     Error)
+}
+
+@Composable
+fun MainScreen(
+    uiState: MainUiState,
+    onToggleConnection: () -> Unit,
+    onSelectProfile: (String) -> Unit,
+    onRemoveProfile: (String) -> Unit,
+    onAddProfile: (String) -> Unit,
+    onDismissError: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var showAddDialog by remember { mutableStateOf(false) }
+    // Отслеживаем размер списка профилей для определения успешного добавления
+    var profileCountAtDialogOpen by remember { mutableIntStateOf(0) }
+
+    // Закрываем диалог когда список профилей вырос (добавление прошло успешно)
+    LaunchedEffect(showAddDialog) {
+        if (showAddDialog) {
+            profileCountAtDialogOpen = uiState.profiles.size
+        }
+    }
+    LaunchedEffect(uiState.profiles.size, uiState.isAddingProfile) {
+        if (showAddDialog
+            && !uiState.isAddingProfile
+            && uiState.addProfileError == null
+            && uiState.profiles.size > profileCountAtDialogOpen
+        ) {
+            showAddDialog = false
+        }
+    }
+
+    val pill = statusPill(uiState.connectionStatus)
+    val activeProfile = uiState.profiles.find { it.id == uiState.activeProfileId }
+
+    val description = when {
+        uiState.connectionStatus is ConnectionStatus.Error ->
+            (uiState.connectionStatus as ConnectionStatus.Error).message
+        activeProfile != null -> activeProfile.name
+        else -> "Нет выбранного сервера"
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Ink)
+    ) {
+        AnimatedBackground()
+
+        Column(modifier = Modifier.fillMaxSize()) {
+
+            // ── Header ─────────────────────────────────────────────────────
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+            ) {
+                Text(
+                    text = "MPA",
+                    color = TextPrimary,
+                    fontFamily = SpaceGroteskFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp,
+                )
+                Text(
+                    text = pill.label,
+                    color = pill.fg,
+                    fontFamily = SpaceGroteskFamily,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(100.dp))
+                        .background(pill.bg)
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
+
+            // ── Connect button ─────────────────────────────────────────────
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+            ) {
+                ConnectButton(
+                    status = uiState.connectionStatus,
+                    onToggle = onToggleConnection,
+                )
+                Text(
+                    text = description,
+                    color = TextMuted,
+                    fontSize = 13.sp,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+            }
+
+            // ── Servers section ────────────────────────────────────────────
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Ink.copy(alpha = 0.92f))
+            ) {
+                HorizontalDivider(color = Border)
+
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)
+                ) {
+                    Text(
+                        text = "СЕРВЕРЫ",
+                        color = TextMuted,
+                        fontFamily = SpaceGroteskFamily,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 10.sp,
+                        letterSpacing = 0.1.sp,
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(AccentSoft.copy(alpha = 0.5f))
+                            .padding(horizontal = 4.dp)
+                    ) {
+                        IconButton(
+                            onClick = {
+                                showAddDialog = true
+                                profileCountAtDialogOpen = uiState.profiles.size
+                            },
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = "Добавить сервер",
+                                tint = Accent,
+                            )
+                        }
+                        Text(
+                            text = "Добавить",
+                            color = Accent,
+                            fontFamily = SpaceGroteskFamily,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                    }
+                }
+
+                if (uiState.profiles.isEmpty()) {
+                    Text(
+                        text = "Серверов пока нет — нажми «Добавить» и вставь ссылку vless://, " +
+                               "ссылку на подписку или ключ активации от бота.",
+                        color = TextMuted,
+                        fontSize = 13.sp,
+                        lineHeight = 20.sp,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+                    )
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
+                            .padding(top = 4.dp, bottom = 20.dp)
+                    ) {
+                        items(uiState.profiles, key = { it.id }) { profile ->
+                            ServerCard(
+                                profile = profile,
+                                isActive = profile.id == uiState.activeProfileId,
+                                ping = uiState.pings[profile.id],
+                                onSelect = { onSelectProfile(profile.id) },
+                                onRemove = { onRemoveProfile(profile.id) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAddDialog) {
+        AddServerDialog(
+            isLoading = uiState.isAddingProfile,
+            error = uiState.addProfileError,
+            onDismiss = {
+                showAddDialog = false
+                onDismissError()
+            },
+            onAdd = onAddProfile,
+        )
+    }
+}

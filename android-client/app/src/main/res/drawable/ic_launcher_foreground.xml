@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Shield shape -->
+    <path
+        android:fillColor="#E8A33D"
+        android:pathData="M54,18 L76,28 L76,52 C76,65 65,75 54,79 C43,75 32,65 32,52 L32,28 Z" />
+    <!-- Key icon inside shield -->
+    <path
+        android:fillColor="#12161C"
+        android:pathData="M46,50 C43.79,50 42,51.79 42,54 C42,56.21 43.79,58 46,58 C48.21,58 50,56.21 50,54 C50,51.79 48.21,50 46,50Z M46,48 C49.31,48 52,50.69 52,54 L62,54 L62,58 L66,58 L66,54 L68,54 L68,50 L52,50 C52,46.69 49.31,44 46,44 C42.69,44 40,46.69 40,50 C40,53.31 42.69,56 46,56" />
+</vector>
