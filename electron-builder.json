@@ -1,0 +1,40 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.mariittov.mpa",
+  "productName": "MPA",
+  "asar": true,
+  "compression": "maximum",
+  "directories": {
+    "output": "release/${version}"
+  },
+  "files": [
+    "dist-electron",
+    "dist",
+    ".env",
+    "!**/*.map"
+  ],
+  "extraResources": [
+    {
+      "from": "resources/core",
+      "to": "core",
+      "filter": ["**/*"]
+    }
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "artifactName": "${productName}_${version}.${ext}",
+    "requestedExecutionLevel": "requireAdministrator",
+    "electronLanguages": ["ru", "en-US"]
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "deleteAppDataOnUninstall": false
+  }
+}

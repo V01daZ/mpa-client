@@ -1,0 +1,15 @@
+export const IPC = {
+  GetProfiles: 'profiles:get',
+  AddProfileFromUri: 'profiles:add-from-uri',
+  RemoveProfile: 'profiles:remove',
+  GetActiveProfile: 'profiles:get-active',
+  SetActiveProfile: 'profiles:set-active',
+  GetStatus: 'connection:get-status',
+  Connect: 'connection:connect',
+  Disconnect: 'connection:disconnect',
+  StatusChanged: 'connection:status-changed',
+  ProfilesChanged: 'profiles:changed',
+  PingProfile: 'profiles:ping',
+  GetTunEnabled: 'settings:get-tun',
+  SetTunEnabled: 'settings:set-tun',
+} as const
