@@ -12,8 +12,8 @@ android {
         applicationId = "dev.mpa.client"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         val activationApi = project.findProperty("MPA_ACTIVATION_API")?.toString()
             ?: System.getenv("MPA_ACTIVATION_API")
@@ -45,7 +45,6 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
-        // Нативные .so из libbox.aar — оставляем все ABI
         jniLibs {
             useLegacyPackaging = false
         }
@@ -79,7 +78,14 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.workmanager)
 
-    // sing-box libbox — локальный AAR (положи в app/libs/)
+    // CameraX + ML Kit — QR scanner
+    implementation(libs.camerax.core)
+    implementation(libs.camerax.camera2)
+    implementation(libs.camerax.lifecycle)
+    implementation(libs.camerax.view)
+    implementation(libs.mlkit.barcode)
+
+    // sing-box libbox — локальный AAR
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar"))))
 
     debugImplementation(libs.compose.ui.tooling)

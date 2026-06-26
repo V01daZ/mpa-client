@@ -8,12 +8,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,7 +27,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,11 +34,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mpa.client.MainUiState
+import dev.mpa.client.data.AppInfo
 import dev.mpa.client.data.ConnectionStatus
+import dev.mpa.client.data.DownloadState
+import dev.mpa.client.data.ReleaseInfo
+import dev.mpa.client.data.ServerProfile
+import dev.mpa.client.data.SplitTunnelSettings
 import dev.mpa.client.ui.components.AddServerDialog
 import dev.mpa.client.ui.components.AnimatedBackground
+import dev.mpa.client.ui.components.ConfirmDeleteDialog
 import dev.mpa.client.ui.components.ConnectButton
 import dev.mpa.client.ui.components.ServerCard
+import dev.mpa.client.ui.components.UpdateBanner
+import dev.mpa.client.ui.screens.QrScannerScreen
+import dev.mpa.client.ui.screens.SplitTunnelScreen
 import dev.mpa.client.ui.theme.Accent
 import dev.mpa.client.ui.theme.AccentSoft
 import dev.mpa.client.ui.theme.Border
@@ -50,6 +60,8 @@ import dev.mpa.client.ui.theme.SpaceGroteskFamily
 import dev.mpa.client.ui.theme.Surface
 import dev.mpa.client.ui.theme.TextMuted
 import dev.mpa.client.ui.theme.TextPrimary
+
+private enum class Screen { MAIN, QR_SCANNER, SPLIT_TUNNEL }
 
 private data class StatusPill(
     val label: String,
@@ -68,36 +80,59 @@ private fun statusPill(status: ConnectionStatus) = when (status) {
 @Composable
 fun MainScreen(
     uiState: MainUiState,
+    installedApps: List<AppInfo>,
     onToggleConnection: () -> Unit,
     onSelectProfile: (String) -> Unit,
     onRemoveProfile: (String) -> Unit,
     onAddProfile: (String) -> Unit,
     onDismissError: () -> Unit,
+    onSplitTunnelChange: (SplitTunnelSettings) -> Unit,
+    onOpenSplitTunnel: () -> Unit,
+    onUpdateAction: () -> Unit,
+    onDismissUpdate: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var screen by remember { mutableStateOf(Screen.MAIN) }
     var showAddDialog by remember { mutableStateOf(false) }
-    // Отслеживаем размер списка профилей для определения успешного добавления
-    var profileCountAtDialogOpen by remember { mutableIntStateOf(0) }
+    var profileCountAtOpen by remember { mutableIntStateOf(0) }
+    var pendingDeleteProfile by remember { mutableStateOf<ServerProfile?>(null) }
+    var qrResult by remember { mutableStateOf<String?>(null) }
 
-    // Закрываем диалог когда список профилей вырос (добавление прошло успешно)
-    LaunchedEffect(showAddDialog) {
-        if (showAddDialog) {
-            profileCountAtDialogOpen = uiState.profiles.size
+    LaunchedEffect(uiState.profiles.size, uiState.isAddingProfile) {
+        if (showAddDialog && !uiState.isAddingProfile && uiState.addProfileError == null
+            && uiState.profiles.size > profileCountAtOpen) {
+            showAddDialog = false
+            qrResult = null
         }
     }
-    LaunchedEffect(uiState.profiles.size, uiState.isAddingProfile) {
-        if (showAddDialog
-            && !uiState.isAddingProfile
-            && uiState.addProfileError == null
-            && uiState.profiles.size > profileCountAtDialogOpen
-        ) {
-            showAddDialog = false
+
+    when (screen) {
+        Screen.QR_SCANNER -> {
+            QrScannerScreen(
+                onResult = { value ->
+                    qrResult = value
+                    screen = Screen.MAIN
+                    showAddDialog = true
+                    profileCountAtOpen = uiState.profiles.size
+                },
+                onBack = { screen = Screen.MAIN }
+            )
+            return
         }
+        Screen.SPLIT_TUNNEL -> {
+            SplitTunnelScreen(
+                settings = uiState.splitTunnel,
+                apps = installedApps,
+                onSettingsChange = onSplitTunnelChange,
+                onBack = { screen = Screen.MAIN }
+            )
+            return
+        }
+        Screen.MAIN -> { /* продолжаем */ }
     }
 
     val pill = statusPill(uiState.connectionStatus)
     val activeProfile = uiState.profiles.find { it.id == uiState.activeProfileId }
-
     val description = when {
         uiState.connectionStatus is ConnectionStatus.Error ->
             (uiState.connectionStatus as ConnectionStatus.Error).message
@@ -105,10 +140,14 @@ fun MainScreen(
         else -> "Нет выбранного сервера"
     }
 
+    // Показываем баннер если есть релиз и пользователь не скрыл,
+    // или если уже скачано (не даём скрыть пока не нажал "Установить")
+    val showBanner = uiState.availableRelease != null
+        && (!uiState.updateDismissed || uiState.downloadState is DownloadState.Ready
+            || uiState.downloadState is DownloadState.Downloading)
+
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Ink)
+        modifier = modifier.fillMaxSize().background(Ink)
     ) {
         AnimatedBackground()
 
@@ -130,16 +169,41 @@ fun MainScreen(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 18.sp,
                 )
-                Text(
-                    text = pill.label,
-                    color = pill.fg,
-                    fontFamily = SpaceGroteskFamily,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 12.sp,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(100.dp))
-                        .background(pill.bg)
-                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    IconButton(
+                        onClick = { onOpenSplitTunnel(); screen = Screen.SPLIT_TUNNEL }
+                    ) {
+                        Icon(
+                            Icons.Default.PhoneAndroid,
+                            contentDescription = "Выбор приложений",
+                            tint = if (uiState.splitTunnel.enabled) Accent else TextMuted,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Text(
+                        text = pill.label,
+                        color = pill.fg,
+                        fontFamily = SpaceGroteskFamily,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(100.dp))
+                            .background(pill.bg)
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            // ── Update banner ──────────────────────────────────────────────
+            if (showBanner) {
+                UpdateBanner(
+                    release       = uiState.availableRelease!!,
+                    downloadState = uiState.downloadState,
+                    onUpdate      = onUpdateAction,
+                    onDismiss     = onDismissUpdate,
                 )
             }
 
@@ -198,14 +262,10 @@ fun MainScreen(
                         IconButton(
                             onClick = {
                                 showAddDialog = true
-                                profileCountAtDialogOpen = uiState.profiles.size
-                            },
+                                profileCountAtOpen = uiState.profiles.size
+                            }
                         ) {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = "Добавить сервер",
-                                tint = Accent,
-                            )
+                            Icon(Icons.Default.Add, contentDescription = "Добавить", tint = Accent)
                         }
                         Text(
                             text = "Добавить",
@@ -237,11 +297,11 @@ fun MainScreen(
                     ) {
                         items(uiState.profiles, key = { it.id }) { profile ->
                             ServerCard(
-                                profile = profile,
+                                profile  = profile,
                                 isActive = profile.id == uiState.activeProfileId,
-                                ping = uiState.pings[profile.id],
+                                ping     = uiState.pings[profile.id],
                                 onSelect = { onSelectProfile(profile.id) },
-                                onRemove = { onRemoveProfile(profile.id) },
+                                onRemove = { pendingDeleteProfile = profile },
                             )
                         }
                     }
@@ -252,13 +312,20 @@ fun MainScreen(
 
     if (showAddDialog) {
         AddServerDialog(
-            isLoading = uiState.isAddingProfile,
-            error = uiState.addProfileError,
-            onDismiss = {
-                showAddDialog = false
-                onDismissError()
-            },
-            onAdd = onAddProfile,
+            isLoading    = uiState.isAddingProfile,
+            error        = uiState.addProfileError,
+            initialInput = qrResult ?: "",
+            onDismiss    = { showAddDialog = false; qrResult = null; onDismissError() },
+            onAdd        = onAddProfile,
+            onScanQr     = { showAddDialog = false; screen = Screen.QR_SCANNER },
+        )
+    }
+
+    pendingDeleteProfile?.let { profile ->
+        ConfirmDeleteDialog(
+            profileName = profile.name,
+            onConfirm   = { onRemoveProfile(profile.id); pendingDeleteProfile = null },
+            onDismiss   = { pendingDeleteProfile = null }
         )
     }
 }

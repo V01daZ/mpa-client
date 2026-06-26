@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -18,6 +20,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,18 +43,16 @@ import dev.mpa.client.ui.theme.Surface
 import dev.mpa.client.ui.theme.TextMuted
 import dev.mpa.client.ui.theme.TextPrimary
 
-/**
- * Диалог добавления сервера.
- * Зеркало src/components/AddServerDialog.tsx.
- */
 @Composable
 fun AddServerDialog(
     isLoading: Boolean,
     error: String?,
+    initialInput: String = "",
     onDismiss: () -> Unit,
     onAdd: (String) -> Unit,
+    onScanQr: () -> Unit,
 ) {
-    var input by remember { mutableStateOf("") }
+    var input by remember(initialInput) { mutableStateOf(initialInput) }
 
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -76,6 +76,15 @@ fun AddServerDialog(
                     fontSize = 16.sp,
                     modifier = Modifier.weight(1f),
                 )
+                // Кнопка QR
+                IconButton(onClick = onScanQr) {
+                    Icon(
+                        Icons.Default.QrCodeScanner,
+                        contentDescription = "Сканировать QR",
+                        tint = Accent,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
                 IconButton(onClick = onDismiss) {
                     Icon(Icons.Default.Close, contentDescription = "Закрыть", tint = TextMuted)
                 }
@@ -91,7 +100,6 @@ fun AddServerDialog(
                 fontSize = 10.sp,
                 letterSpacing = 0.1.sp,
             )
-
             Spacer(Modifier.height(4.dp))
 
             OutlinedTextField(
@@ -127,11 +135,7 @@ fun AddServerDialog(
 
             if (error != null) {
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    text = error,
-                    color = Error,
-                    fontSize = 12.sp,
-                )
+                Text(text = error, color = Error, fontSize = 12.sp)
             }
 
             Spacer(Modifier.height(16.dp))
@@ -158,9 +162,8 @@ fun AddServerDialog(
             Spacer(Modifier.height(12.dp))
 
             Text(
-                text = "Сюда можно вставить ссылку vless://..., ссылку на подписку " +
-                       "или короткий ключ активации от бота — формат определится автоматически. " +
-                       "Профили из подписки/ключа обновляются раз в час сами.",
+                text = "Вставь ссылку vless://, ссылку на подписку или ключ активации. " +
+                       "Или нажми иконку QR-кода чтобы сканировать.",
                 color = TextMuted,
                 fontSize = 11.sp,
                 lineHeight = 16.sp,

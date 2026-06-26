@@ -14,31 +14,15 @@ object SingBoxConfig {
         val isServerIp = isIpAddress(profile.address)
 
         val config = mapOf(
-            "log" to mapOf(
-                "level" to "info",
-                "timestamp" to true
-            ),
+            "log" to mapOf("level" to "info", "timestamp" to true),
 
             "dns" to mapOf(
                 "servers" to listOf(
-                    mapOf(
-                        "tag" to "dns-remote",
-                        "address" to "https://1.1.1.1/dns-query",
-                        "detour" to "proxy"
-                    ),
-                    mapOf(
-                        "tag" to "dns-direct",
-                        "address" to "local",
-                        "detour" to "direct"
-                    )
+                    mapOf("tag" to "dns-remote", "address" to "https://1.1.1.1/dns-query", "detour" to "proxy"),
+                    mapOf("tag" to "dns-direct",  "address" to "local", "detour" to "direct")
                 ),
                 "rules" to buildList {
-                    if (!isServerIp) {
-                        add(mapOf(
-                            "domain" to listOf(profile.address),
-                            "server" to "dns-direct"
-                        ))
-                    }
+                    if (!isServerIp) add(mapOf("domain" to listOf(profile.address), "server" to "dns-direct"))
                 },
                 "final" to "dns-remote",
                 "strategy" to "prefer_ipv4"
@@ -51,10 +35,6 @@ object SingBoxConfig {
                     "inet4_address" to TUN_ADDRESS_V4,
                     "inet6_address" to TUN_ADDRESS_V6,
                     "mtu" to 9000,
-                    // auto_route=false: маршруты уже добавлены через VpnService.Builder
-                    // (addRoute 0.0.0.0/0 и ::/0)
-                    // auto_route=true заставляет sing-box биндить форвардер к интерфейсу
-                    // через netlink — это запрещено SELinux в Android без root
                     "auto_route" to false,
                     "stack" to "gvisor",
                     "sniff" to true,
@@ -73,10 +53,7 @@ object SingBoxConfig {
                     "tls" to mapOf(
                         "enabled" to true,
                         "server_name" to profile.serverName,
-                        "utls" to mapOf(
-                            "enabled" to true,
-                            "fingerprint" to profile.fingerprint.ifEmpty { "chrome" }
-                        ),
+                        "utls" to mapOf("enabled" to true, "fingerprint" to profile.fingerprint.ifEmpty { "chrome" }),
                         "reality" to mapOf(
                             "enabled" to true,
                             "public_key" to profile.publicKey,
@@ -92,18 +69,7 @@ object SingBoxConfig {
                 "final" to "proxy",
                 "rules" to listOf(
                     mapOf("protocol" to "dns", "outbound" to "dns-out"),
-                    mapOf("ip_cidr" to listOf(
-                        "10.0.0.0/8",
-                        "127.0.0.0/8",
-                        "169.254.0.0/16",
-                        "172.16.0.0/12",
-                        "192.168.0.0/16",
-                        "224.0.0.0/4",
-                        "240.0.0.0/4",
-                        "::1/128",
-                        "fc00::/7",
-                        "fe80::/10"
-                    ), "outbound" to "direct")
+                    mapOf("ip_cidr" to PRIVATE_CIDRS, "outbound" to "direct")
                 )
             )
         )
@@ -111,7 +77,13 @@ object SingBoxConfig {
         return gson.toJson(config)
     }
 
-    private fun isIpAddress(host: String): Boolean {
-        return host.matches(Regex("""\d{1,3}(\.\d{1,3}){3}""")) || host.contains(':')
-    }
+    private fun isIpAddress(host: String) =
+        host.matches(Regex("""\d{1,3}(\.\d{1,3}){3}""")) || host.contains(':')
+
+    private val PRIVATE_CIDRS = listOf(
+        "10.0.0.0/8", "127.0.0.0/8", "169.254.0.0/16",
+        "172.16.0.0/12", "192.168.0.0/16",
+        "224.0.0.0/4", "240.0.0.0/4",
+        "::1/128", "fc00::/7", "fe80::/10"
+    )
 }

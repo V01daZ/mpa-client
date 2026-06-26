@@ -8,6 +8,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.google.gson.Gson
 import dev.mpa.client.data.ProfileRepository
 import dev.mpa.client.data.SourceType
 import dev.mpa.client.data.SubscriptionResolver
@@ -49,7 +50,7 @@ class SubscriptionRefreshWorker(
                         MpaVpnService::class.java
                     ).apply {
                         action = MpaVpnService.ACTION_CONNECT
-                        putExtra(MpaVpnService.EXTRA_PROFILE_JSON, updated.toString())
+                        putExtra(MpaVpnService.EXTRA_PROFILE_JSON, Gson().toJson(updated))
                     }
                     applicationContext.startForegroundService(intent)
                 }

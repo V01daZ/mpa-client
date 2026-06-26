@@ -7,63 +7,40 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore("mpa_profiles")
 
-/**
- * Хранилище профилей на базе DataStore.
- * Зеркало electron/main/store.ts — те же операции, те же концепции.
- */
 class ProfileRepository(private val context: Context) {
 
     private val gson = Gson()
 
     private object Keys {
-        val PROFILES = stringPreferencesKey("profiles")
+        val PROFILES  = stringPreferencesKey("profiles")
         val ACTIVE_ID = stringPreferencesKey("active_profile_id")
     }
 
     val profilesFlow: Flow<List<ServerProfile>> = context.dataStore.data.map { prefs ->
-        val json = prefs[Keys.PROFILES] ?: return@map emptyList()
-        val type = object : TypeToken<List<ServerProfile>>() {}.type
-        try {
-            gson.fromJson<List<ServerProfile>>(json, type) ?: emptyList()
-        } catch (e: Exception) {
-            emptyList()
-        }
+        parseProfiles(prefs[Keys.PROFILES])
     }
 
     val activeProfileIdFlow: Flow<String?> = context.dataStore.data.map { prefs ->
-        prefs[Keys.ACTIVE_ID]
-    }
-
-    suspend fun getProfiles(): List<ServerProfile> {
-        var result: List<ServerProfile> = emptyList()
-        context.dataStore.data.collect { prefs ->
-            val json = prefs[Keys.PROFILES] ?: return@collect
-            val type = object : TypeToken<List<ServerProfile>>() {}.type
-            result = try {
-                gson.fromJson<List<ServerProfile>>(json, type) ?: emptyList()
-            } catch (e: Exception) {
-                emptyList()
-            }
-            return@collect
-        }
-        return result
+        prefs[Keys.ACTIVE_ID]?.takeIf { it.isNotEmpty() }
     }
 
     suspend fun addProfile(profile: ServerProfile): ServerProfile {
-        context.dataStore.edit { prefs ->
+        val uniqueProfile = context.dataStore.edit { prefs ->
             val current = parseProfiles(prefs[Keys.PROFILES])
-            val updated = current + profile
+            // Дедупликация имён: если имя уже занято - добавляем (1), (2) и т.д.
+            val finalName = deduplicateName(profile.name, current.map { it.name })
+            val toAdd = profile.copy(name = finalName)
+            val updated = current + toAdd
             prefs[Keys.PROFILES] = gson.toJson(updated)
-            // Если профилей не было - ставим первый активным
-            if (current.isEmpty()) {
-                prefs[Keys.ACTIVE_ID] = profile.id
-            }
+            if (current.isEmpty()) prefs[Keys.ACTIVE_ID] = toAdd.id
         }
-        return profile
+        // Возвращаем добавленный профиль с финальным именем
+        return profilesFlow.first().last()
     }
 
     suspend fun removeProfile(id: String) {
@@ -80,33 +57,36 @@ class ProfileRepository(private val context: Context) {
     suspend fun updateProfile(id: String, update: ServerProfile) {
         context.dataStore.edit { prefs ->
             val current = parseProfiles(prefs[Keys.PROFILES])
-            val updated = current.map { if (it.id == id) update else it }
-            prefs[Keys.PROFILES] = gson.toJson(updated)
+            prefs[Keys.PROFILES] = gson.toJson(current.map { if (it.id == id) update else it })
         }
     }
 
     suspend fun setActiveProfileId(id: String) {
-        context.dataStore.edit { prefs ->
-            prefs[Keys.ACTIVE_ID] = id
-        }
+        context.dataStore.edit { prefs -> prefs[Keys.ACTIVE_ID] = id }
     }
 
-    suspend fun getActiveProfileId(): String? {
-        var result: String? = null
-        context.dataStore.data.collect { prefs ->
-            result = prefs[Keys.ACTIVE_ID]?.takeIf { it.isNotEmpty() }
-            return@collect
-        }
-        return result
+    suspend fun getProfiles(): List<ServerProfile> =
+        profilesFlow.first()
+
+    suspend fun getActiveProfileId(): String? =
+        activeProfileIdFlow.first()
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+
+    /**
+     * Если имя уже существует в списке — добавляет (1), (2) и т.д.
+     * "Finland MPA" → "Finland MPA (1)" → "Finland MPA (2)"
+     */
+    private fun deduplicateName(name: String, existingNames: List<String>): String {
+        if (name !in existingNames) return name
+        var counter = 1
+        while ("$name ($counter)" in existingNames) counter++
+        return "$name ($counter)"
     }
 
     private fun parseProfiles(json: String?): List<ServerProfile> {
         if (json.isNullOrEmpty()) return emptyList()
         val type = object : TypeToken<List<ServerProfile>>() {}.type
-        return try {
-            gson.fromJson<List<ServerProfile>>(json, type) ?: emptyList()
-        } catch (e: Exception) {
-            emptyList()
-        }
+        return try { gson.fromJson(json, type) ?: emptyList() } catch (_: Exception) { emptyList() }
     }
 }

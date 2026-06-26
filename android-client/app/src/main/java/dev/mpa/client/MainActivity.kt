@@ -19,46 +19,42 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 
-    // Лаунчер разрешения VPN (аналог диалога UAC на десктопе)
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        viewModel.onVpnPermissionResult(result.resultCode == RESULT_OK)
-    }
+    ) { result -> viewModel.onVpnPermissionResult(result.resultCode == RESULT_OK) }
 
-    // Лаунчер разрешения уведомлений (Android 13+)
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* просто принимаем результат */ }
+    ) {}
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Запрашиваем разрешение на уведомления (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
-            ) {
+                != PackageManager.PERMISSION_GRANTED) {
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
 
         setContent {
             MpaTheme {
-                val uiState by viewModel.uiState.collectAsState()
+                val uiState      by viewModel.uiState.collectAsState()
+                val installedApps by viewModel.installedApps.collectAsState()
 
                 MainScreen(
-                    uiState = uiState,
-                    onToggleConnection = {
-                        viewModel.toggleConnection(vpnPermissionLauncher)
-                    },
-                    onSelectProfile = viewModel::setActiveProfile,
-                    onRemoveProfile = viewModel::removeProfile,
-                    onAddProfile = { input ->
-                        viewModel.addProfileFromInput(input)
-                    },
-                    onDismissError = viewModel::clearAddError,
+                    uiState           = uiState,
+                    installedApps     = installedApps,
+                    onToggleConnection = { viewModel.toggleConnection(vpnPermissionLauncher) },
+                    onSelectProfile   = viewModel::setActiveProfile,
+                    onRemoveProfile   = viewModel::removeProfile,
+                    onAddProfile      = viewModel::addProfileFromInput,
+                    onDismissError    = viewModel::clearAddError,
+                    onSplitTunnelChange = viewModel::updateSplitTunnel,
+                    onOpenSplitTunnel = viewModel::loadInstalledApps,
+                    onUpdateAction    = viewModel::onUpdateAction,
+                    onDismissUpdate   = viewModel::dismissUpdate,
                 )
             }
         }
@@ -68,6 +64,8 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         viewModel.bindService()
         viewModel.refreshAllPings()
+        // Проверяем обновления при каждом открытии приложения
+        viewModel.checkForUpdate()
     }
 
     override fun onStop() {

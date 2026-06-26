@@ -9,14 +9,23 @@ import android.net.VpnService
 import android.os.Binder
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.google.gson.Gson
 import dev.mpa.client.MainActivity
 import dev.mpa.client.R
 import dev.mpa.client.data.ConnectionStatus
 import dev.mpa.client.data.ServerProfile
 import dev.mpa.client.data.SingBoxConfig
+import dev.mpa.client.data.SplitTunnelRepository
+import dev.mpa.client.data.SplitTunnelSettings
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import libbox.BoxService
 import libbox.InterfaceUpdateListener
 import libbox.Libbox
@@ -30,7 +39,7 @@ class MpaVpnService : VpnService() {
     companion object {
         const val ACTION_CONNECT    = "dev.mpa.client.ACTION_CONNECT"
         const val ACTION_DISCONNECT = "dev.mpa.client.ACTION_DISCONNECT"
-        const val EXTRA_PROFILE_JSON = "profile_json"
+        const val EXTRA_PROFILE_JSON = "dev.mpa.client.EXTRA_PROFILE_JSON"
 
         private const val NOTIF_CHANNEL_ID = "mpa_vpn"
         private const val NOTIF_ID = 1
@@ -44,47 +53,59 @@ class MpaVpnService : VpnService() {
     }
 
     private val binder = LocalBinder()
+    private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var boxService: BoxService? = null
     private var tunFd: Int = -1
 
-    // ── Lifecycle ──────────────────────────────────────────────────────────
-
-    override fun onCreate() {
-        super.onCreate()
-        createNotificationChannel()
-    }
-
+    override fun onCreate() { super.onCreate(); createNotificationChannel() }
     override fun onBind(intent: Intent?): IBinder = binder
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_DISCONNECT) {
-            disconnect()
-            stopSelf()
+        when (intent?.action) {
+            ACTION_CONNECT -> {
+                val json = intent.getStringExtra(EXTRA_PROFILE_JSON)
+                if (json != null) {
+                    serviceScope.launch {
+                        try {
+                            val profile = Gson().fromJson(json, ServerProfile::class.java)
+                            val splitTunnel = SplitTunnelRepository(applicationContext).settingsFlow.first()
+                            connect(profile, splitTunnel)
+                        } catch (e: Exception) {
+                            android.util.Log.e("MpaVpnService", "Intent connect error: ${e.message}")
+                        }
+                    }
+                }
+            }
+            ACTION_DISCONNECT -> {
+                disconnect()
+                stopSelf()
+            }
         }
         return START_NOT_STICKY
     }
-
-    override fun onDestroy() { disconnect(); super.onDestroy() }
+    override fun onDestroy() {
+        serviceScope.cancel()
+        disconnect()
+        super.onDestroy()
+    }
     override fun onRevoke()  { disconnect() }
 
     // ── Public API ─────────────────────────────────────────────────────────
 
-    fun connect(profile: ServerProfile) {
+    fun connect(profile: ServerProfile, splitTunnel: SplitTunnelSettings = SplitTunnelSettings()) {
         if (_status.value.isBusy || _status.value.isConnected) disconnect()
         _status.value = ConnectionStatus.Connecting(profile.id)
 
         try {
             val configJson = SingBoxConfig.build(profile)
-            android.util.Log.d("MpaVpnService", "Config: $configJson")
+            android.util.Log.d("MpaVpnService", "Config:\n$configJson")
 
-            tunFd = buildTunInterface()
+            tunFd = buildTunInterface(splitTunnel)
             val svc = Libbox.newService(configJson, buildPlatformInterface(tunFd))
             svc.start()
             boxService = svc
 
             startForeground(NOTIF_ID, buildNotification(profile.name, connected = true))
             _status.value = ConnectionStatus.Connected(profile.id)
-
         } catch (e: Exception) {
             android.util.Log.e("MpaVpnService", "connect error: ${e.message}", e)
             _status.value = ConnectionStatus.Error(e.message ?: "Ошибка sing-box")
@@ -92,12 +113,12 @@ class MpaVpnService : VpnService() {
     }
 
     fun disconnect() {
-        val prevProfile = when (val s = _status.value) {
+        val prev = when (val s = _status.value) {
             is ConnectionStatus.Connected  -> s.profileId
             is ConnectionStatus.Connecting -> s.profileId
             else -> null
         }
-        _status.value = ConnectionStatus.Disconnecting(prevProfile)
+        _status.value = ConnectionStatus.Disconnecting(prev)
         try { boxService?.close() } catch (_: Exception) {}
         boxService = null
         tunFd = -1
@@ -106,13 +127,8 @@ class MpaVpnService : VpnService() {
     }
 
     // ── TUN ────────────────────────────────────────────────────────────────
-    //
-    // auto_route=false в конфиге sing-box — значит sing-box НЕ добавляет маршруты сам.
-    // Весь роутинг задаём здесь через VpnService.Builder.
-    // Приватные подсети исключаем через addRoute с более специфичными префиксами
-    // (Android не поддерживает excludeRoute, только addRoute — используем split tunneling).
 
-    private fun buildTunInterface(): Int {
+    private fun buildTunInterface(splitTunnel: SplitTunnelSettings): Int {
         val builder = Builder()
             .setSession("MPA")
             .addAddress(
@@ -125,89 +141,64 @@ class MpaVpnService : VpnService() {
             )
             .addDnsServer("1.1.1.1")
             .setMtu(9000)
-            // Само приложение идёт мимо TUN — иначе sing-box зациклится
+            // Само приложение всегда мимо TUN
             .addDisallowedApplication(packageName)
 
-        // Маршрутизируем весь публичный трафик в TUN.
-        // Приватные подсети добавляем через более специфичные маршруты — они
-        // перекрывают дефолтный 0.0.0.0/0 на уровне ядра.
-        // 
-        // Публичный IPv4: всё кроме 10/8, 172.16/12, 192.168/16, 127/8, 169.254/16
-        PUBLIC_IPV4_ROUTES.forEach { (addr, prefix) ->
-            builder.addRoute(addr, prefix)
+        // Split tunnel
+        if (splitTunnel.enabled && splitTunnel.packageNames.isNotEmpty()) {
+            if (splitTunnel.whitelistMode) {
+                // Белый список: только выбранные приложения идут через VPN
+                // Все остальные — напрямую (addDisallowedApplication для всего кроме выбранных)
+                val allPackages = packageManager.getInstalledApplications(0)
+                    .map { it.packageName }
+                    .filter { it != packageName }
+                val bypass = allPackages.toSet() - splitTunnel.packageNames
+                bypass.forEach { runCatching { builder.addDisallowedApplication(it) } }
+            } else {
+                // Чёрный список: выбранные приложения идут напрямую (bypass VPN)
+                splitTunnel.packageNames.forEach { runCatching { builder.addDisallowedApplication(it) } }
+            }
         }
-        // Весь IPv6 в TUN (кроме link-local — они не роутятся)
+
+        // Публичный IPv4 через TUN (split по RFC1918)
+        PUBLIC_IPV4_ROUTES.forEach { (addr, prefix) -> builder.addRoute(addr, prefix) }
         builder.addRoute("::", 0)
 
-        val pfd = builder.establish()
+        return builder.establish()
+            ?.detachFd()
             ?: throw IllegalStateException("VpnService.Builder.establish() вернул null — нет разрешения VPN")
-
-        return pfd.detachFd()
     }
 
-    // Split tunneling для IPv4: весь публичный трафик, без приватных подсетей.
-    // Получено разбиением 0.0.0.0/0 с исключением RFC1918 + loopback + link-local.
     private val PUBLIC_IPV4_ROUTES = listOf(
-        "1.0.0.0" to 8,
-        "2.0.0.0" to 7,
-        "4.0.0.0" to 6,
-        "8.0.0.0" to 7,
-        "11.0.0.0" to 8,
-        "12.0.0.0" to 6,
-        "16.0.0.0" to 4,
-        "32.0.0.0" to 3,
-        "64.0.0.0" to 2,
-        "128.0.0.0" to 3,
-        "160.0.0.0" to 5,
-        "168.0.0.0" to 6,
-        "170.0.0.0" to 7,
-        "172.0.0.0" to 12,
-        "172.32.0.0" to 11,
-        "172.64.0.0" to 10,
-        "172.128.0.0" to 9,
-        "173.0.0.0" to 8,
-        "174.0.0.0" to 7,
-        "176.0.0.0" to 4,
-        "192.0.0.0" to 9,
-        "192.128.0.0" to 11,
-        "192.160.0.0" to 13,
-        "192.169.0.0" to 16,
-        "192.170.0.0" to 15,
-        "192.172.0.0" to 14,
-        "192.176.0.0" to 12,
-        "192.192.0.0" to 10,
-        "193.0.0.0" to 8,
-        "194.0.0.0" to 7,
-        "196.0.0.0" to 6,
-        "200.0.0.0" to 5,
-        "208.0.0.0" to 4
+        "1.0.0.0" to 8,  "2.0.0.0" to 7,  "4.0.0.0" to 6,
+        "8.0.0.0" to 7,  "11.0.0.0" to 8, "12.0.0.0" to 6,
+        "16.0.0.0" to 4, "32.0.0.0" to 3, "64.0.0.0" to 2,
+        "128.0.0.0" to 3,"160.0.0.0" to 5,"168.0.0.0" to 6,
+        "170.0.0.0" to 7,"172.0.0.0" to 12,"172.32.0.0" to 11,
+        "172.64.0.0" to 10,"172.128.0.0" to 9,"173.0.0.0" to 8,
+        "174.0.0.0" to 7,"176.0.0.0" to 4,"192.0.0.0" to 9,
+        "192.128.0.0" to 11,"192.160.0.0" to 13,"192.169.0.0" to 16,
+        "192.170.0.0" to 15,"192.172.0.0" to 14,"192.176.0.0" to 12,
+        "192.192.0.0" to 10,"193.0.0.0" to 8,"194.0.0.0" to 7,
+        "196.0.0.0" to 6,"200.0.0.0" to 5,"208.0.0.0" to 4
     )
 
     // ── PlatformInterface ──────────────────────────────────────────────────
 
     private fun buildPlatformInterface(fd: Int): PlatformInterface = object : PlatformInterface {
-
         override fun openTun(options: TunOptions?): Int = fd
-
         override fun autoDetectInterfaceControl(fd: Int) { protect(fd) }
-
         override fun usePlatformAutoDetectInterfaceControl(): Boolean = true
         override fun usePlatformDefaultInterfaceMonitor(): Boolean    = true
         override fun usePlatformInterfaceGetter(): Boolean            = true
-
         override fun useProcFS(): Boolean             = false
         override fun includeAllNetworks(): Boolean    = false
         override fun underNetworkExtension(): Boolean = false
-
         override fun readWIFIState(): WIFIState?      = null
         override fun writeLog(message: String)        { android.util.Log.d("SingBox", message) }
         override fun clearDNSCache()                  {}
-
-        override fun findConnectionOwner(
-            ipProtocol: Int, sourceAddress: String, sourcePort: Int,
-            destinationAddress: String, destinationPort: Int
-        ): Int = -1
-
+        override fun findConnectionOwner(ipProtocol: Int, sourceAddress: String, sourcePort: Int,
+            destinationAddress: String, destinationPort: Int): Int = -1
         override fun packageNameByUid(uid: Int): String         = ""
         override fun uidByPackageName(packageName: String): Int = -1
         override fun getInterfaces(): NetworkInterfaceIterator? = null
@@ -218,23 +209,18 @@ class MpaVpnService : VpnService() {
     // ── Notifications ──────────────────────────────────────────────────────
 
     private fun createNotificationChannel() {
-        val mgr = getSystemService(NotificationManager::class.java)
-        mgr.createNotificationChannel(
+        getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(NOTIF_CHANNEL_ID, "MPA VPN", NotificationManager.IMPORTANCE_LOW)
                 .also { it.setShowBadge(false) }
         )
     }
 
     private fun buildNotification(serverName: String, connected: Boolean): Notification {
-        val mainPi = PendingIntent.getActivity(
-            this, 0, Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        val disconnectPi = PendingIntent.getService(
-            this, 0,
+        val mainPi = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val disconnectPi = PendingIntent.getService(this, 0,
             Intent(this, MpaVpnService::class.java).apply { action = ACTION_DISCONNECT },
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         return NotificationCompat.Builder(this, NOTIF_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_vpn_key)
             .setContentTitle(if (connected) "MPA подключено" else "MPA подключается...")
