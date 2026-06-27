@@ -4,10 +4,7 @@ Android VPN client for **MPA (Mariittov Private Access)** based on [sing-box](ht
 Supports VLESS + XTLS-Vision + Reality — the same protocol as the desktop client.
 
 > **Note:** This is a client app only. You need your own VLESS+Reality server and either a `vless://` link, subscription URL, or activation key from the MPA Telegram bot.
-
-## Screenshots
-
-_TODO: add screenshots_
+> 
 
 ## Features
 
