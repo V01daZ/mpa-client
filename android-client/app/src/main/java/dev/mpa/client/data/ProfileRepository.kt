@@ -30,17 +30,58 @@ class ProfileRepository(private val context: Context) {
     }
 
     suspend fun addProfile(profile: ServerProfile): ServerProfile {
-        val uniqueProfile = context.dataStore.edit { prefs ->
+        context.dataStore.edit { prefs ->
             val current = parseProfiles(prefs[Keys.PROFILES])
-            // Дедупликация имён: если имя уже занято - добавляем (1), (2) и т.д.
             val finalName = deduplicateName(profile.name, current.map { it.name })
             val toAdd = profile.copy(name = finalName)
             val updated = current + toAdd
             prefs[Keys.PROFILES] = gson.toJson(updated)
             if (current.isEmpty()) prefs[Keys.ACTIVE_ID] = toAdd.id
         }
-        // Возвращаем добавленный профиль с финальным именем
         return profilesFlow.first().last()
+    }
+
+    suspend fun addProfiles(profiles: List<ServerProfile>) {
+        context.dataStore.edit { prefs ->
+            val current = parseProfiles(prefs[Keys.PROFILES])
+            val updated = current.toMutableList()
+            
+            profiles.forEach { profile ->
+                // Ищем существующий профиль по URL источника и либо по имени, либо по адресу/порту
+                // (если провайдер сменил имя сервера, но адрес остался тот же, или наоборот)
+                val existingIndex = updated.indexOfFirst { 
+                    it.sourceUrl == profile.sourceUrl && (it.name == profile.name || (it.address == profile.address && it.port == profile.port))
+                }
+                
+                if (existingIndex != -1) {
+                    val existing = updated[existingIndex]
+                    // Обновляем данные, сохраняя ID и пользовательское имя группы
+                    updated[existingIndex] = profile.copy(
+                        id = existing.id,
+                        groupName = existing.groupName ?: profile.groupName
+                    )
+                } else {
+                    // Это действительно новый сервер в подписке
+                    val finalName = deduplicateName(profile.name, updated.map { it.name })
+                    updated.add(profile.copy(name = finalName))
+                }
+            }
+            
+            prefs[Keys.PROFILES] = gson.toJson(updated)
+            if (current.isEmpty() && updated.isNotEmpty()) {
+                prefs[Keys.ACTIVE_ID] = updated.first().id
+            }
+        }
+    }
+
+    suspend fun updateGroupName(sourceUrl: String, newGroupName: String) {
+        context.dataStore.edit { prefs ->
+            val current = parseProfiles(prefs[Keys.PROFILES])
+            val updated = current.map { 
+                if (it.sourceUrl == sourceUrl) it.copy(groupName = newGroupName) else it 
+            }
+            prefs[Keys.PROFILES] = gson.toJson(updated)
+        }
     }
 
     suspend fun removeProfile(id: String) {

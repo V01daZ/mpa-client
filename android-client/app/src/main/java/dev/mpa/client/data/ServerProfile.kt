@@ -19,6 +19,7 @@ data class ServerProfile(
     val sourceUrl: String? = null,
     val activationKey: String? = null,
     val updatedAt: Long? = null,
+    val groupName: String? = null,
 )
 
 enum class SourceType { VLESS, SUBSCRIPTION, ACTIVATION }

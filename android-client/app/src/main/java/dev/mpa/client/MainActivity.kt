@@ -53,6 +53,9 @@ class MainActivity : ComponentActivity() {
                     onDismissError    = viewModel::clearAddError,
                     onSplitTunnelChange = viewModel::updateSplitTunnel,
                     onOpenSplitTunnel = viewModel::loadInstalledApps,
+                    onToggleGroup     = viewModel::toggleGroup,
+                    onRenameGroup     = viewModel::renameGroup,
+                    onRefreshGroup    = viewModel::forceRefreshGroup,
                     onUpdateAction    = viewModel::onUpdateAction,
                     onDismissUpdate   = viewModel::dismissUpdate,
                 )

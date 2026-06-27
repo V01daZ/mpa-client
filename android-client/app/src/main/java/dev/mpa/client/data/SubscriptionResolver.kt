@@ -26,29 +26,31 @@ object SubscriptionResolver {
         val activationKey: String? = null,
     )
 
-    suspend fun resolve(rawInput: String): ResolvedProfile = withContext(Dispatchers.IO) {
+    suspend fun resolve(rawInput: String): List<ResolvedProfile> = withContext(Dispatchers.IO) {
         val input = rawInput.trim()
 
         when {
             input.lowercase().startsWith("vless://") -> {
                 val profile = VlessParser.parse(input)
-                ResolvedProfile(profile, SourceType.VLESS)
+                listOf(ResolvedProfile(profile, SourceType.VLESS))
             }
 
             input.matches(Regex("^https?://.*", RegexOption.IGNORE_CASE)) -> {
-                val profile = fetchVlessFromSubscription(input)
-                ResolvedProfile(profile, SourceType.SUBSCRIPTION, sourceUrl = input)
+                val profiles = fetchAllVlessFromSubscription(input)
+                profiles.map { ResolvedProfile(it, SourceType.SUBSCRIPTION, sourceUrl = input) }
             }
 
             input.matches(Regex("^\\d+$")) -> {
                 val subscriptionUrl = resolveActivationKey(input)
-                val profile = fetchVlessFromSubscription(subscriptionUrl)
-                ResolvedProfile(
-                    profile,
-                    SourceType.ACTIVATION,
-                    sourceUrl = subscriptionUrl,
-                    activationKey = input
-                )
+                val profiles = fetchAllVlessFromSubscription(subscriptionUrl)
+                profiles.map { 
+                    ResolvedProfile(
+                        it,
+                        SourceType.ACTIVATION,
+                        sourceUrl = subscriptionUrl,
+                        activationKey = input
+                    )
+                }
             }
 
             else -> throw IllegalArgumentException(
@@ -58,31 +60,15 @@ object SubscriptionResolver {
         }
     }
 
-    suspend fun refetch(profile: ServerProfile): ServerProfile? = withContext(Dispatchers.IO) {
-        when (profile.sourceType) {
-            SourceType.ACTIVATION -> {
-                val key = profile.activationKey ?: return@withContext null
-                val subscriptionUrl = resolveActivationKey(key)
-                val fresh = fetchVlessFromSubscription(subscriptionUrl)
-                fresh.copy(
-                    id = profile.id,
-                    sourceType = SourceType.ACTIVATION,
-                    activationKey = key,
-                    sourceUrl = subscriptionUrl,
-                    updatedAt = System.currentTimeMillis()
-                )
-            }
-            SourceType.SUBSCRIPTION -> {
-                val url = profile.sourceUrl ?: return@withContext null
-                val fresh = fetchVlessFromSubscription(url)
-                fresh.copy(
-                    id = profile.id,
-                    sourceType = SourceType.SUBSCRIPTION,
-                    sourceUrl = url,
-                    updatedAt = System.currentTimeMillis()
-                )
-            }
-            SourceType.VLESS -> null
+    suspend fun refetchAll(sourceUrl: String, sourceType: SourceType, activationKey: String?): List<ServerProfile> = withContext(Dispatchers.IO) {
+        val fresh = fetchAllVlessFromSubscription(sourceUrl)
+        fresh.map { 
+            it.copy(
+                sourceType = sourceType,
+                sourceUrl = sourceUrl,
+                activationKey = activationKey,
+                updatedAt = System.currentTimeMillis()
+            )
         }
     }
 
@@ -106,15 +92,17 @@ object SubscriptionResolver {
         return match.groupValues[1]
     }
 
-    private fun fetchVlessFromSubscription(url: String): ServerProfile {
+    private fun fetchAllVlessFromSubscription(url: String): List<ServerProfile> {
         val (code, body) = httpGet(url)
         if (code != 200) throw IllegalStateException("Ошибка загрузки подписки: HTTP $code")
         val decoded = decodeSubscription(body)
-        val line = decoded.lines()
+        val lines = decoded.lines()
             .map { it.trim() }
-            .firstOrNull { it.lowercase().startsWith("vless://") }
-            ?: throw IllegalStateException("В подписке не найдено ни одной ссылки vless://")
-        return VlessParser.parse(line)
+            .filter { it.lowercase().startsWith("vless://") }
+        
+        if (lines.isEmpty()) throw IllegalStateException("В подписке не найдено ни одной ссылки vless://")
+        
+        return lines.map { VlessParser.parse(it) }
     }
 
     private fun decodeSubscription(raw: String): String {

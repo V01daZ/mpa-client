@@ -49,10 +49,11 @@ fun AddServerDialog(
     error: String?,
     initialInput: String = "",
     onDismiss: () -> Unit,
-    onAdd: (String) -> Unit,
+    onAdd: (String, String?) -> Unit,
     onScanQr: () -> Unit,
 ) {
     var input by remember(initialInput) { mutableStateOf(initialInput) }
+    var groupName by remember { mutableStateOf("") }
 
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -140,8 +141,44 @@ fun AddServerDialog(
 
             Spacer(Modifier.height(16.dp))
 
+            Text(
+                text = "НАЗВАНИЕ ГРУППЫ (НЕОБЯЗАТЕЛЬНО)",
+                color = TextMuted,
+                fontFamily = SpaceGroteskFamily,
+                fontWeight = FontWeight.Medium,
+                fontSize = 10.sp,
+                letterSpacing = 0.1.sp,
+            )
+            Spacer(Modifier.height(4.dp))
+
+            OutlinedTextField(
+                value = groupName,
+                onValueChange = { groupName = it },
+                placeholder = {
+                    Text(
+                        "Напр. Личная подписка",
+                        color = TextMuted,
+                        fontSize = 13.sp,
+                    )
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Accent,
+                    unfocusedBorderColor = Border,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
+                    cursorColor = Accent,
+                    focusedContainerColor = Ink,
+                    unfocusedContainerColor = Ink,
+                ),
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(Modifier.height(16.dp))
+
             Button(
-                onClick = { onAdd(input.trim()) },
+                onClick = { onAdd(input.trim(), groupName.trim().takeIf { it.isNotEmpty() }) },
                 enabled = !isLoading && input.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Accent,

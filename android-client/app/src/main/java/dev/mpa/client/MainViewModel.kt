@@ -45,6 +45,7 @@ data class MainUiState(
     val availableRelease: ReleaseInfo? = null,
     val downloadState: DownloadState = DownloadState.Idle,
     val updateDismissed: Boolean = false,
+    val expandedGroups: Set<String> = emptySet(),
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -61,6 +62,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _availableRelease = MutableStateFlow<ReleaseInfo?>(null)
     private val _downloadState   = MutableStateFlow<DownloadState>(DownloadState.Idle)
     private val _updateDismissed = MutableStateFlow(false)
+    private val _expandedGroups  = MutableStateFlow<Set<String>>(emptySet())
 
     // ── Промежуточные объединения чтобы не превышать arity combine() ───────
 
@@ -98,14 +100,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val availableRelease: ReleaseInfo?,
         val downloadState: DownloadState,
         val updateDismissed: Boolean,
+        val expandedGroups: Set<String>,
     )
     private val _group3 = combine(
         splitTunnelRepo.settingsFlow,
         _availableRelease,
         _downloadState,
         _updateDismissed,
-    ) { st, rel, dl, dismissed ->
-        Group3(st, rel, dl, dismissed)
+        _expandedGroups,
+    ) { st, rel, dl, dismissed, expanded ->
+        Group3(st, rel, dl, dismissed, expanded)
     }
 
     // ── Финальный uiState из трёх групп ───────────────────────────────────
@@ -126,6 +130,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             availableRelease = g3.availableRelease,
             downloadState    = g3.downloadState,
             updateDismissed  = g3.updateDismissed,
+            expandedGroups   = g3.expandedGroups,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MainUiState())
 
@@ -255,21 +260,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ── Profiles ───────────────────────────────────────────────────────────
 
-    fun addProfileFromInput(input: String) {
+    fun addProfileFromInput(input: String, groupName: String? = null) {
         if (_isAdding.value) return
         _isAdding.value = true
         _addError.value = null
         viewModelScope.launch {
             try {
-                val resolved = withContext(Dispatchers.IO) { SubscriptionResolver.resolve(input) }
-                val profile = resolved.profile.copy(
-                    sourceType    = resolved.sourceType,
-                    sourceUrl     = resolved.sourceUrl,
-                    activationKey = resolved.activationKey,
-                    updatedAt     = System.currentTimeMillis(),
-                )
-                repository.addProfile(profile)
-                refreshPingFor(profile)
+                val resolvedList = withContext(Dispatchers.IO) { SubscriptionResolver.resolve(input) }
+                val profilesToAdd = resolvedList.map { resolved ->
+                    resolved.profile.copy(
+                        sourceType    = resolved.sourceType,
+                        sourceUrl     = resolved.sourceUrl,
+                        activationKey = resolved.activationKey,
+                        updatedAt     = System.currentTimeMillis(),
+                        groupName     = groupName.takeIf { it?.isNotBlank() == true }
+                    )
+                }
+                repository.addProfiles(profilesToAdd)
+                
+                // Пингуем только новые
+                profilesToAdd.forEach { refreshPingFor(it) }
             } catch (e: Exception) {
                 _addError.value = e.message ?: "Неизвестная ошибка"
             } finally {
@@ -278,9 +288,69 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun renameGroup(sourceUrl: String, newName: String) {
+        viewModelScope.launch {
+            repository.updateGroupName(sourceUrl, newName)
+        }
+    }
+
+    fun forceRefreshGroup(sourceUrl: String) {
+        if (_isAdding.value) return
+        _isAdding.value = true
+        _addError.value = null
+        viewModelScope.launch {
+            try {
+                // Ищем любой профиль из этой группы, чтобы получить параметры источника
+                val profiles = repository.getProfiles()
+                val profile = profiles.find { it.sourceUrl == sourceUrl } ?: return@launch
+                
+                val freshProfiles = withContext(Dispatchers.IO) {
+                    SubscriptionResolver.refetchAll(
+                        sourceUrl,
+                        profile.sourceType,
+                        profile.activationKey
+                    )
+                }
+                
+                repository.addProfiles(freshProfiles)
+                
+                // Переподключаем VPN, если активный профиль был в этой группе
+                val activeId = repository.getActiveProfileId()
+                val updatedProfiles = repository.getProfiles()
+                val activeProfile = updatedProfiles.find { it.id == activeId }
+                
+                if (activeProfile?.sourceUrl == sourceUrl && MpaVpnService.status.value.isConnected) {
+                    connectToProfile(activeId!!)
+                }
+                
+                freshProfiles.forEach { refreshPingFor(it) }
+            } catch (e: Exception) {
+                _addError.value = e.message ?: "Ошибка обновления"
+            } finally {
+                _isAdding.value = false
+            }
+        }
+    }
+
     fun clearAddError()      { _addError.value = null }
     fun removeProfile(id: String) { viewModelScope.launch { repository.removeProfile(id) } }
-    fun setActiveProfile(id: String) { viewModelScope.launch { repository.setActiveProfileId(id) } }
+    fun setActiveProfile(id: String) {
+        viewModelScope.launch {
+            repository.setActiveProfileId(id)
+            
+            // Если VPN подключён — перезапускаем на новом профиле
+            val status = uiState.value.connectionStatus
+            if (status.isConnected || status.isBusy) {
+                connectToProfile(id)
+            }
+        }
+    }
+
+    fun toggleGroup(sourceUrl: String) {
+        _expandedGroups.update { 
+            if (it.contains(sourceUrl)) it - sourceUrl else it + sourceUrl 
+        }
+    }
 
     // ── Ping ───────────────────────────────────────────────────────────────
 

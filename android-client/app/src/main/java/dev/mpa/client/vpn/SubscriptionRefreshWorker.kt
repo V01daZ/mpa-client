@@ -33,29 +33,42 @@ class SubscriptionRefreshWorker(
         val profiles = repository.getProfiles()
         var hadError = false
 
-        profiles.forEach { profile ->
-            if (profile.sourceType == SourceType.VLESS) return@forEach
+        // Группируем профили по URL источника, чтобы не запрашивать один и тот же URL много раз
+        val sources = profiles
+            .filter { it.sourceType != SourceType.VLESS && !it.sourceUrl.isNullOrEmpty() }
+            .groupBy { it.sourceUrl!! }
 
+        sources.forEach { (url, _) ->
             try {
-                val updated = SubscriptionResolver.refetch(profile) ?: return@forEach
-                repository.updateProfile(profile.id, updated)
+                // Берем любой профиль из группы, чтобы достать тип и ключ
+                val firstProfile = sources[url]?.firstOrNull() ?: return@forEach
+                
+                val freshProfiles = SubscriptionResolver.refetchAll(
+                    url, 
+                    firstProfile.sourceType, 
+                    firstProfile.activationKey
+                )
+                
+                // Массово обновляем/добавляем
+                repository.addProfiles(freshProfiles)
 
-                // Если это активный профиль и VPN сейчас подключён -
-                // переподключаемся с новым конфигом
+                // Если активный профиль в этой группе и VPN подключён - переподключаемся
                 val activeId = repository.getActiveProfileId()
+                val activeProfile = repository.getProfiles().find { it.id == activeId }
+                
                 val status = MpaVpnService.status.value
-                if (profile.id == activeId && status.isConnected) {
+                if (activeProfile?.sourceUrl == url && status.isConnected) {
                     val intent = android.content.Intent(
                         applicationContext,
                         MpaVpnService::class.java
                     ).apply {
                         action = MpaVpnService.ACTION_CONNECT
-                        putExtra(MpaVpnService.EXTRA_PROFILE_JSON, Gson().toJson(updated))
+                        putExtra(MpaVpnService.EXTRA_PROFILE_JSON, Gson().toJson(activeProfile))
                     }
                     applicationContext.startForegroundService(intent)
                 }
             } catch (e: Exception) {
-                android.util.Log.w("SubscriptionRefresh", "Failed to refresh ${profile.name}: ${e.message}")
+                android.util.Log.w("SubscriptionRefresh", "Failed to refresh $url: ${e.message}")
                 hadError = true
             }
         }
