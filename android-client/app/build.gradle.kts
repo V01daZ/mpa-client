@@ -19,6 +19,12 @@ android {
             ?: System.getenv("MPA_ACTIVATION_API")
             ?: ""
         buildConfigField("String", "MPA_ACTIVATION_API", "\"$activationApi\"")
+
+        ndk {
+            // Включаем только мобильные архитектуры. 
+            // x86 и x86_64 нужны только для эмуляторов и весят много.
+            abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
+        }
     }
 
     buildTypes {
@@ -33,6 +39,14 @@ android {
         debug {
             isDebuggable = true
             applicationIdSuffix = ".debug"
+            // Включаем оптимизацию даже в дебаге, если нужно потестить размер
+            isMinifyEnabled = false 
+        }
+    }
+
+    bundle {
+        abi {
+            enableSplit = true
         }
     }
 

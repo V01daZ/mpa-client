@@ -22,8 +22,6 @@ sealed class DownloadState {
 
 object ApkDownloader {
 
-    private const val PROVIDER_AUTHORITY = "dev.mpa.client.fileprovider"
-
     /**
      * Скачивает APK с прогрессом. Возвращает Flow<DownloadState>.
      */
@@ -69,15 +67,20 @@ object ApkDownloader {
      * Требует FileProvider и разрешение REQUEST_INSTALL_PACKAGES.
      */
     fun installApk(context: Context, apkFile: File) {
-        val uri: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            FileProvider.getUriForFile(context, PROVIDER_AUTHORITY, apkFile)
-        } else {
-            Uri.fromFile(apkFile)
+        try {
+            val authority = "${context.packageName}.fileprovider"
+            val uri: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                FileProvider.getUriForFile(context, authority, apkFile)
+            } else {
+                Uri.fromFile(apkFile)
+            }
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("ApkDownloader", "Failed to start installation", e)
         }
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
-        }
-        context.startActivity(intent)
     }
 }
