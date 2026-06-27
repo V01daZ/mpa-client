@@ -281,6 +281,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _addError.value = null
         viewModelScope.launch {
             try {
+                val profiles = repository.getProfiles()
+                val finalGroupName = if (groupName.isNullOrBlank()) {
+                    generateNextProfileGroupName(profiles)
+                } else {
+                    groupName
+                }
+
                 val resolvedList = withContext(Dispatchers.IO) { SubscriptionResolver.resolve(input) }
                 val profilesToAdd = resolvedList.map { resolved ->
                     resolved.profile.copy(
@@ -288,7 +295,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         sourceUrl     = resolved.sourceUrl,
                         activationKey = resolved.activationKey,
                         updatedAt     = System.currentTimeMillis(),
-                        groupName     = groupName.takeIf { it?.isNotBlank() == true }
+                        groupName     = finalGroupName
                     )
                 }
                 repository.addProfiles(profilesToAdd)
@@ -301,6 +308,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _isAdding.value = false
             }
         }
+    }
+
+    private fun generateNextProfileGroupName(existingProfiles: List<ServerProfile>): String {
+        val groups = existingProfiles.mapNotNull { it.groupName }.toSet()
+        val regex = Regex("""Profile (\d+)""")
+        val numbers = groups.mapNotNull { 
+            regex.matchEntire(it)?.groupValues?.get(1)?.toIntOrNull() 
+        }
+        val nextNum = if (numbers.isEmpty()) 1 else (numbers.maxOrNull() ?: 0) + 1
+        return "Profile $nextNum"
     }
 
     fun renameGroup(sourceUrl: String, newName: String) {

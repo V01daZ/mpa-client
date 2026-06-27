@@ -35,7 +35,8 @@ private data class GithubAsset(
 object UpdateChecker {
 
     private const val API_URL =
-        "https://api.github.com/repos/V01daZ/mpa-client/releases/tags/beta_android"
+        "https://api.github.com/repos/V01daZ/mpa-client/releases/latest"
+
 
     /**
      * Проверяет наличие обновления.
