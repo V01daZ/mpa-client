@@ -69,6 +69,8 @@ class MainActivity : ComponentActivity() {
         viewModel.refreshAllPings()
         // Проверяем обновления при каждом открытии приложения
         viewModel.checkForUpdate()
+        // Скачиваем/обновляем RU rule-set для умного роутинга
+        viewModel.downloadRuleSets()
     }
 
     override fun onStop() {
@@ -76,3 +78,4 @@ class MainActivity : ComponentActivity() {
         super.onStop()
     }
 }
+

@@ -32,6 +32,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.InetSocketAddress
+import dev.mpa.client.data.RuleSetDownloader
+import dev.mpa.client.data.RuleSetState
 import java.net.Socket
 
 data class MainUiState(
@@ -46,6 +48,7 @@ data class MainUiState(
     val downloadState: DownloadState = DownloadState.Idle,
     val updateDismissed: Boolean = false,
     val expandedGroups: Set<String> = emptySet(),
+    val ruleSetState: RuleSetState = RuleSetState.Idle,
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -63,6 +66,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _downloadState   = MutableStateFlow<DownloadState>(DownloadState.Idle)
     private val _updateDismissed = MutableStateFlow(false)
     private val _expandedGroups  = MutableStateFlow<Set<String>>(emptySet())
+    private val _ruleSetState    = MutableStateFlow<RuleSetState>(RuleSetState.Idle)
 
     // ── Промежуточные объединения чтобы не превышать arity combine() ───────
 
@@ -101,15 +105,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val downloadState: DownloadState,
         val updateDismissed: Boolean,
         val expandedGroups: Set<String>,
+        val ruleSetState: RuleSetState,
     )
     private val _group3 = combine(
         splitTunnelRepo.settingsFlow,
         _availableRelease,
-        _downloadState,
-        _updateDismissed,
-        _expandedGroups,
-    ) { st, rel, dl, dismissed, expanded ->
-        Group3(st, rel, dl, dismissed, expanded)
+        combine(_downloadState, _updateDismissed) { dl, dismissed -> dl to dismissed },
+        combine(_expandedGroups, _ruleSetState) { expanded, rss -> expanded to rss },
+    ) { st, rel, (dl, dismissed), (expanded, rss) ->
+        Group3(st, rel, dl, dismissed, expanded, rss)
     }
 
     // ── Финальный uiState из трёх групп ───────────────────────────────────
@@ -131,6 +135,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             downloadState    = g3.downloadState,
             updateDismissed  = g3.updateDismissed,
             expandedGroups   = g3.expandedGroups,
+            ruleSetState     = g3.ruleSetState,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MainUiState())
 
@@ -201,6 +206,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             vpnService = (binder as MpaVpnService.LocalBinder).service
         }
         override fun onServiceDisconnected(name: ComponentName) { vpnService = null }
+    }
+
+    // ── Rule sets ──────────────────────────────────────────────────────────
+
+    fun downloadRuleSets() {
+        viewModelScope.launch {
+            RuleSetDownloader.ensureReady(context).collect { state ->
+                _ruleSetState.value = state
+            }
+        }
     }
 
     fun bindService() {
@@ -373,3 +388,4 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } catch (_: Exception) { null }
     }
 }
+

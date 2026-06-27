@@ -54,6 +54,7 @@ import dev.mpa.client.MainUiState
 import dev.mpa.client.data.AppInfo
 import dev.mpa.client.data.ConnectionStatus
 import dev.mpa.client.data.DownloadState
+import dev.mpa.client.data.RuleSetState
 import dev.mpa.client.data.ReleaseInfo
 import dev.mpa.client.data.ServerProfile
 import dev.mpa.client.data.SplitTunnelSettings
@@ -62,6 +63,7 @@ import dev.mpa.client.ui.components.AnimatedBackground
 import dev.mpa.client.ui.components.ConfirmDeleteDialog
 import dev.mpa.client.ui.components.ConnectButton
 import dev.mpa.client.ui.components.ServerCard
+import dev.mpa.client.ui.components.RuleSetBanner
 import dev.mpa.client.ui.components.UpdateBanner
 import dev.mpa.client.ui.screens.QrScannerScreen
 import dev.mpa.client.ui.screens.SplitTunnelScreen
@@ -227,6 +229,9 @@ fun MainScreen(
                     onDismiss     = onDismissUpdate,
                 )
             }
+
+            // ── Rule-set banner (скачивание RU правил) ─────────────────────
+            RuleSetBanner(state = uiState.ruleSetState)
 
             // ── Connect button ─────────────────────────────────────────────
             Column(
@@ -569,3 +574,4 @@ private fun GroupHeader(
         }
     }
 }
+

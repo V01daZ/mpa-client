@@ -96,7 +96,7 @@ class MpaVpnService : VpnService() {
         _status.value = ConnectionStatus.Connecting(profile.id)
 
         try {
-            val configJson = SingBoxConfig.build(profile)
+            val configJson = SingBoxConfig.build(profile, filesDir.absolutePath)
             android.util.Log.d("MpaVpnService", "Config:\n$configJson")
 
             tunFd = buildTunInterface(splitTunnel)
@@ -231,3 +231,4 @@ class MpaVpnService : VpnService() {
             .build()
     }
 }
+
