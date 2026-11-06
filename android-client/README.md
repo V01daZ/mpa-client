@@ -11,10 +11,10 @@ Supports VLESS + XTLS-Vision + Reality — the same protocol as the desktop clie
 - VLESS + Reality + uTLS — full support
 - Three input formats: `vless://` link, subscription URL, activation key
 - Automatic hourly subscription refresh (WorkManager)
-- Dark theme — same palette as the desktop client (#12161C / #E8A33D copper / #5FBF9F teal)
-- Space Grotesk + JetBrains Mono fonts
-- Animated background
-- Per-server TCP ping
+- "Boarding pass" UI: the connection is a ticket (server, ping, status, session time), servers are a departure board sorted by ping
+- Golos Text + JetBrains Mono fonts (bundled in `res/font`, SIL OFL)
+- Per-server TCP ping; servers whose ping changed noticeably are highlighted
+- Split tunnelling per app (bypass list or "only these apps")
 - Foreground VPN service with quick-disconnect notification
 - Auto-start on boot
 
@@ -74,19 +74,10 @@ app/libs/libbox-sources.jar   # optional, for IDE sources
 
 ---
 
-### Step 2 — Add fonts
+### Step 2 — Fonts
 
-Download and place TTF files in `app/src/main/res/font/`:
-
-| File | Source |
-|---|---|
-| `space_grotesk_regular.ttf` | [Google Fonts — Space Grotesk](https://fonts.google.com/specimen/Space+Grotesk) |
-| `space_grotesk_medium.ttf` | same |
-| `space_grotesk_semibold.ttf` | same |
-| `space_grotesk_bold.ttf` | same |
-| `jetbrains_mono_regular.ttf` | [JetBrains Mono](https://www.jetbrains.com/legalnotices/font/) |
-
-Both fonts are free and open-source (SIL Open Font License).
+Fonts are already in the repo (`app/src/main/res/font/`, variable TTFs, SIL Open Font License):
+[Golos Text](https://fonts.google.com/specimen/Golos+Text) and [JetBrains Mono](https://www.jetbrains.com/lp/mono/). Nothing to download.
 
 ---
 

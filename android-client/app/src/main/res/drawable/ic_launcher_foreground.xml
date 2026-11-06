@@ -1,15 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Иконка MPA: посадочный талон с буквой M и зелёным огоньком «подключено» -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Shield shape -->
-    <path
-        android:fillColor="#E8A33D"
-        android:pathData="M54,18 L76,28 L76,52 C76,65 65,75 54,79 C43,75 32,65 32,52 L32,28 Z" />
-    <!-- Key icon inside shield -->
-    <path
-        android:fillColor="#12161C"
-        android:pathData="M46,50 C43.79,50 42,51.79 42,54 C42,56.21 43.79,58 46,58 C48.21,58 50,56.21 50,54 C50,51.79 48.21,50 46,50Z M46,48 C49.31,48 52,50.69 52,54 L62,54 L62,58 L66,58 L66,54 L68,54 L68,50 L52,50 C52,46.69 49.31,44 46,44 C42.69,44 40,46.69 40,50 C40,53.31 42.69,56 46,56" />
+    <path android:fillColor="#E9E7E2" android:pathData="M30,34 H58 A4,4 0 0,0 66,34 H78 A4,4 0 0,1 82,38 V70 A4,4 0 0,1 78,74 H66 A4,4 0 0,0 58,74 H30 A4,4 0 0,1 26,70 V38 A4,4 0 0,1 30,34 Z" />
+    <path android:fillColor="#18181B" android:pathData="M33,64 L33,44 L38,44 L44,53 L50,44 L55,44 L55,64 L50,64 L50,53 L44,61.5 L38,53 L38,64 Z" />
+    <path android:fillColor="#C4C2BC" android:pathData="M61.2,40h1.6v3h-1.6z M61.2,45.5h1.6v3h-1.6z M61.2,51h1.6v3h-1.6z M61.2,56.5h1.6v3h-1.6z M61.2,62h1.6v3h-1.6z" />
+    <path android:fillColor="#6FC495" android:pathData="M72,54 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
 </vector>

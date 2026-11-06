@@ -20,9 +20,6 @@ app/release/
 *.jks
 keystore.properties
 
-# Fonts — скачай вручную, см. README
-app/src/main/res/font/
-
 # sing-box libbox — собирается вручную, см. README
 # Не коммитить: 51 МБ бинарник
 app/libs/libbox.aar

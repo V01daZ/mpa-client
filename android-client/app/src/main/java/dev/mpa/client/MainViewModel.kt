@@ -47,8 +47,9 @@ data class MainUiState(
     val availableRelease: ReleaseInfo? = null,
     val downloadState: DownloadState = DownloadState.Idle,
     val updateDismissed: Boolean = false,
-    val expandedGroups: Set<String> = emptySet(),
+    val collapsedGroups: Set<String> = emptySet(),
     val ruleSetState: RuleSetState = RuleSetState.Idle,
+    val refreshingGroup: String? = null,
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -65,8 +66,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _availableRelease = MutableStateFlow<ReleaseInfo?>(null)
     private val _downloadState   = MutableStateFlow<DownloadState>(DownloadState.Idle)
     private val _updateDismissed = MutableStateFlow(false)
-    private val _expandedGroups  = MutableStateFlow<Set<String>>(emptySet())
+    private val _collapsedGroups  = MutableStateFlow<Set<String>>(emptySet())
     private val _ruleSetState    = MutableStateFlow<RuleSetState>(RuleSetState.Idle)
+    private val _refreshingGroup = MutableStateFlow<String?>(null)
 
     // ── Промежуточные объединения чтобы не превышать arity combine() ───────
 
@@ -89,13 +91,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val pings: Map<String, Int?>,
         val addError: String?,
         val isAdding: Boolean,
+        val refreshingGroup: String?,
     )
     private val _group2 = combine(
         _pings,
         _addError,
         _isAdding,
-    ) { pings, err, adding ->
-        Group2(pings, err, adding)
+        _refreshingGroup,
+    ) { pings, err, adding, refreshing ->
+        Group2(pings, err, adding, refreshing)
     }
 
     // Группа 3: split tunnel + обновления
@@ -104,14 +108,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val availableRelease: ReleaseInfo?,
         val downloadState: DownloadState,
         val updateDismissed: Boolean,
-        val expandedGroups: Set<String>,
+        val collapsedGroups: Set<String>,
         val ruleSetState: RuleSetState,
     )
     private val _group3 = combine(
         splitTunnelRepo.settingsFlow,
         _availableRelease,
         combine(_downloadState, _updateDismissed) { dl, dismissed -> dl to dismissed },
-        combine(_expandedGroups, _ruleSetState) { expanded, rss -> expanded to rss },
+        combine(_collapsedGroups, _ruleSetState) { expanded, rss -> expanded to rss },
     ) { st, rel, (dl, dismissed), (expanded, rss) ->
         Group3(st, rel, dl, dismissed, expanded, rss)
     }
@@ -134,8 +138,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             availableRelease = g3.availableRelease,
             downloadState    = g3.downloadState,
             updateDismissed  = g3.updateDismissed,
-            expandedGroups   = g3.expandedGroups,
+            collapsedGroups   = g3.collapsedGroups,
             ruleSetState     = g3.ruleSetState,
+            refreshingGroup  = g2.refreshingGroup,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MainUiState())
 
@@ -153,14 +158,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ── Split tunnel ───────────────────────────────────────────────────────
 
-    fun updateSplitTunnel(settings: SplitTunnelSettings) {
-        viewModelScope.launch {
-            splitTunnelRepo.save(settings)
+    private var splitReconnectJob: kotlinx.coroutines.Job? = null
 
-            // Если VPN сейчас подключён — переподключаемся, чтобы применить новые правила
-            val status = uiState.value.connectionStatus
-            if (status.isConnected) {
-                val activeId = uiState.value.activeProfileId ?: return@launch
+    fun updateSplitTunnel(settings: SplitTunnelSettings) {
+        viewModelScope.launch { splitTunnelRepo.save(settings) }
+
+        // Если VPN подключён — переподключаемся, чтобы применить правила.
+        // С задержкой: иначе каждая отметка в списке рвала соединение.
+        splitReconnectJob?.cancel()
+        splitReconnectJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(1500)
+            if (MpaVpnService.status.value.isConnected) {
+                val activeId = repository.getActiveProfileId() ?: return@launch
                 connectToProfile(activeId)
             }
         }
@@ -259,8 +268,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val profile = uiState.value.profiles.find { it.id == profileId } ?: return
         val splitTunnel = uiState.value.splitTunnel
         viewModelScope.launch {
-            val service = getOrStartService()
-            service.connect(profile, splitTunnel)
+            try {
+                getOrStartService().connect(profile, splitTunnel)
+            } catch (e: Exception) {
+                MpaVpnService.reportError(e.message ?: "VPN-сервис не запустился")
+            }
         }
     }
 
@@ -269,8 +281,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private suspend fun getOrStartService(): MpaVpnService {
         vpnService?.let { return it }
         context.startForegroundService(Intent(context, MpaVpnService::class.java))
-        kotlinx.coroutines.delay(300)
-        return vpnService ?: throw IllegalStateException("VPN-сервис не запустился")
+        bindService()
+        // Ждём привязку вместо фиксированной задержки: на медленных устройствах 300 мс не хватало
+        repeat(30) {
+            vpnService?.let { return it }
+            kotlinx.coroutines.delay(100)
+        }
+        throw IllegalStateException("VPN-сервис не запустился")
     }
 
     // ── Profiles ───────────────────────────────────────────────────────────
@@ -303,7 +320,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // Пингуем только новые
                 profilesToAdd.forEach { refreshPingFor(it) }
             } catch (e: Exception) {
-                _addError.value = e.message ?: "Неизвестная ошибка"
+                _addError.value = friendlyError(e)
             } finally {
                 _isAdding.value = false
             }
@@ -312,12 +329,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun generateNextProfileGroupName(existingProfiles: List<ServerProfile>): String {
         val groups = existingProfiles.mapNotNull { it.groupName }.toSet()
-        val regex = Regex("""Profile (\d+)""")
+        // Старые группы назывались "Profile N" — учитываем их в нумерации
+        val regex = Regex("""(?:Profile|Подписка) (\d+)""")
         val numbers = groups.mapNotNull { 
             regex.matchEntire(it)?.groupValues?.get(1)?.toIntOrNull() 
         }
         val nextNum = if (numbers.isEmpty()) 1 else (numbers.maxOrNull() ?: 0) + 1
-        return "Profile $nextNum"
+        return "Подписка $nextNum"
     }
 
     fun renameGroup(sourceUrl: String, newName: String) {
@@ -327,8 +345,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun forceRefreshGroup(sourceUrl: String) {
-        if (_isAdding.value) return
-        _isAdding.value = true
+        if (_isAdding.value || _refreshingGroup.value != null) return
+        _refreshingGroup.value = sourceUrl
         _addError.value = null
         viewModelScope.launch {
             try {
@@ -357,11 +375,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 
                 freshProfiles.forEach { refreshPingFor(it) }
             } catch (e: Exception) {
-                _addError.value = e.message ?: "Ошибка обновления"
+                _addError.value = "Подписка не обновилась. " + friendlyError(e)
             } finally {
-                _isAdding.value = false
+                _refreshingGroup.value = null
             }
         }
+    }
+
+    /** Понятный текст ошибки вместо сырого исключения. */
+    private fun friendlyError(e: Exception): String = when (e) {
+        is java.net.UnknownHostException -> "Сервер не найден. Проверь ссылку и интернет."
+        is java.net.SocketTimeoutException -> "Сервер не ответил вовремя. Попробуй ещё раз."
+        is java.net.ConnectException -> "Не удалось подключиться к серверу подписки."
+        is javax.net.ssl.SSLException -> "Ошибка защищённого соединения с сервером подписки."
+        is java.io.IOException ->
+            if (e.message?.contains("Cleartext", true) == true) "Нужна ссылка https://, http:// не поддерживается."
+            else "Ошибка сети: ${e.message ?: "нет ответа"}"
+        else -> e.message ?: "Не получилось разобрать ключ или ссылку."
     }
 
     fun clearAddError()      { _addError.value = null }
@@ -379,7 +409,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleGroup(sourceUrl: String) {
-        _expandedGroups.update { 
+        _collapsedGroups.update { 
             if (it.contains(sourceUrl)) it - sourceUrl else it + sourceUrl 
         }
     }
@@ -387,13 +417,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ── Ping ───────────────────────────────────────────────────────────────
 
     fun refreshAllPings() {
-        viewModelScope.launch { uiState.value.profiles.forEach { refreshPingFor(it) } }
+        // Берём список из хранилища: uiState при старте Activity ещё пустой и пинги не мерились
+        viewModelScope.launch { repository.getProfiles().forEach { refreshPingFor(it) } }
     }
 
     private fun refreshPingFor(profile: ServerProfile) {
         viewModelScope.launch {
             val ms = withContext(Dispatchers.IO) { tcpPing(profile.address, profile.port) }
-            _pings.update { it + (profile.id to ms) }
+            _pings.update { it + (profile.id to (ms ?: -1)) }  // -1 = недоступен
         }
     }
 
