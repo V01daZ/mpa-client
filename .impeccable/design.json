@@ -1,0 +1,428 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-06T00:00:00Z",
+  "title": "Design System: MPA",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Graphite Ground",
+        "canonical": "oklch(21.0% 0.006 286)",
+        "tonalRamp": [
+          "#0B0B0E",
+          "#242427",
+          "#3F3F43",
+          "#5D5D61",
+          "#7D7D81",
+          "#9E9EA2",
+          "#C3C4C8",
+          "#EEEEF2"
+        ]
+      },
+      "board": {
+        "role": "neutral",
+        "displayName": "Board",
+        "canonical": "oklch(24.5% 0.008 286)",
+        "tonalRamp": [
+          "#0B0B0E",
+          "#242428",
+          "#3F3F44",
+          "#5D5D62",
+          "#7D7D82",
+          "#9E9EA3",
+          "#C3C3C9",
+          "#EEEEF3"
+        ]
+      },
+      "board-raised": {
+        "role": "neutral",
+        "displayName": "Raised Board",
+        "canonical": "oklch(28.3% 0.009 286)",
+        "tonalRamp": [
+          "#0B0B0F",
+          "#232328",
+          "#3F3F44",
+          "#5D5D63",
+          "#7C7D83",
+          "#9E9EA4",
+          "#C3C3CA",
+          "#EEEEF4"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Board Rule",
+        "canonical": "oklch(32.7% 0.011 286)",
+        "tonalRamp": [
+          "#0B0B0F",
+          "#232329",
+          "#3F3F45",
+          "#5D5D63",
+          "#7C7C83",
+          "#9D9EA5",
+          "#C3C3CB",
+          "#EDEEF5"
+        ]
+      },
+      "on-board": {
+        "role": "neutral",
+        "displayName": "Board Ink",
+        "canonical": "oklch(92.5% 0.005 95)",
+        "tonalRamp": [
+          "#0C0B09",
+          "#252421",
+          "#40403D",
+          "#5E5E5A",
+          "#7E7D7A",
+          "#9F9E9B",
+          "#C5C4C0",
+          "#EFEEEA"
+        ]
+      },
+      "on-board-muted": {
+        "role": "neutral",
+        "displayName": "Board Muted",
+        "canonical": "oklch(69.5% 0.012 286)",
+        "tonalRamp": [
+          "#0B0A10",
+          "#23232A",
+          "#3F3F46",
+          "#5D5D64",
+          "#7C7C84",
+          "#9D9DA5",
+          "#C3C3CB",
+          "#EDEDF6"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "canonical": "oklch(92.8% 0.007 89)",
+        "tonalRamp": [
+          "#0C0B08",
+          "#252420",
+          "#41403C",
+          "#5F5D59",
+          "#7F7D79",
+          "#A09E9A",
+          "#C6C4BF",
+          "#F0EEE9"
+        ]
+      },
+      "paper-ink": {
+        "role": "neutral",
+        "displayName": "Paper Ink",
+        "canonical": "oklch(21.0% 0.006 286)",
+        "tonalRamp": [
+          "#0B0B0E",
+          "#242427",
+          "#3F3F43",
+          "#5D5D61",
+          "#7D7D81",
+          "#9E9EA2",
+          "#C3C4C8",
+          "#EEEEF2"
+        ]
+      },
+      "paper-muted": {
+        "role": "neutral",
+        "displayName": "Paper Muted",
+        "canonical": "oklch(51.0% 0.009 294)",
+        "tonalRamp": [
+          "#0B0A0F",
+          "#242328",
+          "#403F44",
+          "#5E5D63",
+          "#7D7C82",
+          "#9E9DA4",
+          "#C4C3CA",
+          "#EEEDF4"
+        ]
+      },
+      "paper-rule": {
+        "role": "neutral",
+        "displayName": "Paper Rule",
+        "canonical": "oklch(81.4% 0.009 91)",
+        "tonalRamp": [
+          "#0C0B07",
+          "#25241F",
+          "#41403B",
+          "#5F5D58",
+          "#7F7D78",
+          "#A09E98",
+          "#C6C4BE",
+          "#F0EEE8"
+        ]
+      },
+      "signal": {
+        "role": "secondary",
+        "displayName": "Soft Coral Signal",
+        "canonical": "oklch(73.4% 0.129 36)",
+        "tonalRamp": [
+          "#270000",
+          "#4A0500",
+          "#6E230D",
+          "#954029",
+          "#BC5E44",
+          "#DF8268",
+          "#FFAA91",
+          "#FFD7BF"
+        ]
+      },
+      "go": {
+        "role": "primary",
+        "displayName": "Gate Green",
+        "canonical": "oklch(75.4% 0.108 158)",
+        "tonalRamp": [
+          "#001301",
+          "#002F13",
+          "#004E2C",
+          "#1B6E47",
+          "#3A9065",
+          "#63B286",
+          "#8FD7AD",
+          "#BEFFD9"
+        ]
+      },
+      "go-deep": {
+        "role": "primary",
+        "displayName": "Deep Gate Green",
+        "canonical": "oklch(53.0% 0.102 157)",
+        "tonalRamp": [
+          "#001301",
+          "#002F12",
+          "#024D2C",
+          "#266D47",
+          "#438F64",
+          "#6AB086",
+          "#94D6AD",
+          "#C3FFD9"
+        ]
+      },
+      "fail": {
+        "role": "tertiary",
+        "displayName": "Soft Fail Red",
+        "canonical": "oklch(71.6% 0.144 21)",
+        "tonalRamp": [
+          "#2A0000",
+          "#4E0008",
+          "#731921",
+          "#9B373B",
+          "#C45457",
+          "#E67979",
+          "#FFA2A0",
+          "#FFD0CD"
+        ]
+      },
+      "fail-deep": {
+        "role": "tertiary",
+        "displayName": "Deep Fail Red",
+        "canonical": "oklch(53.5% 0.150 25)",
+        "tonalRamp": [
+          "#2B0000",
+          "#4F0002",
+          "#75161A",
+          "#9D3534",
+          "#C6534F",
+          "#E97872",
+          "#FFA19A",
+          "#FFCFC7"
+        ]
+      },
+      "signal-wash": {
+        "role": "secondary",
+        "displayName": "Coral Wash",
+        "canonical": "rgba(238, 138, 110, 0.15)",
+        "tonalRamp": [
+          "#270000",
+          "#4A0500",
+          "#6E230D",
+          "#954029",
+          "#BC5E44",
+          "#DF8268",
+          "#FFAA91",
+          "#FFD7BF"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Large figures, Mono."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Screen titles."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Pass route values: «Ты», server name."
+      },
+      "title-medium": {
+        "displayName": "Title Medium",
+        "purpose": "Pass status value, group headers."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Board row server names, dialog copy."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "Pass button and primary actions."
+      },
+      "label": {
+        "displayName": "Field Label",
+        "purpose": "Pass field names and the board's СЕРВЕР | ПИНГ header only."
+      },
+      "data": {
+        "displayName": "Data",
+        "purpose": "Ping in rows, addresses in row menus."
+      },
+      "pass-value": {
+        "displayName": "Pass Value",
+        "purpose": "Ping and elapsed timer on the pass."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "row-wash",
+        "value": "tween 400ms",
+        "purpose": "Board row background change (active, changed, idle)."
+      },
+      {
+        "name": "rerank",
+        "value": "LazyColumn animateItem (Compose default)",
+        "purpose": "Rows slide to their new rank when ping re-sorts the board."
+      },
+      {
+        "name": "status-dot",
+        "value": "animateColorAsState (Compose default spring)",
+        "purpose": "Status dot colour change on the pass."
+      }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Pass Button (off)",
+      "kind": "button",
+      "refersTo": "pass-button-off",
+      "description": "Main action on the pass in every state except connected: «Подключить», «Повторить», «Отменить», «Добавить сервер».",
+      "html": "<button class=\"ds-pass-btn\">Подключить</button>",
+      "css": ".ds-pass-btn{font-family:'Golos Text',sans-serif;width:320px;height:56px;border:none;border-radius:14px;background:#18181B;color:#E9E7E2;font-size:16px;font-weight:600;cursor:pointer;transition:background .2s}.ds-pass-btn:hover{background:#29292E}.ds-pass-btn:focus-visible{outline:2px solid #EE8A6E;outline-offset:2px}.ds-pass-btn:disabled{background:#C4C2BC;color:#66656B}"
+    },
+    {
+      "name": "Pass Button (connected)",
+      "kind": "button",
+      "refersTo": "pass-button-connected",
+      "description": "The only green button: «Отключить», shown only while connected.",
+      "html": "<button class=\"ds-pass-btn-go\">Отключить</button>",
+      "css": ".ds-pass-btn-go{font-family:'Golos Text',sans-serif;width:320px;height:56px;border:none;border-radius:14px;background:#6FC495;color:#18181B;font-size:16px;font-weight:600;cursor:pointer;transition:filter .2s}.ds-pass-btn-go:hover{filter:brightness(1.06)}.ds-pass-btn-go:focus-visible{outline:2px solid #EE8A6E;outline-offset:2px}"
+    },
+    {
+      "name": "Paper Button",
+      "kind": "button",
+      "refersTo": "button-paper",
+      "description": "Primary action on graphite: «Вставить ключ», dialog confirm.",
+      "html": "<button class=\"ds-btn-paper\">Вставить ключ</button>",
+      "css": ".ds-btn-paper{font-family:'Golos Text',sans-serif;min-height:48px;padding:0 24px;border:none;border-radius:9999px;background:#E9E7E2;color:#18181B;font-size:14px;font-weight:600;cursor:pointer}.ds-btn-paper:hover{background:#C4C2BC}.ds-btn-paper:focus-visible{outline:2px solid #EE8A6E;outline-offset:2px}"
+    },
+    {
+      "name": "Outlined Button",
+      "kind": "button",
+      "refersTo": "",
+      "description": "Secondary action on graphite, e.g. «QR-код».",
+      "html": "<button class=\"ds-btn-out\">QR-код</button>",
+      "css": ".ds-btn-out{font-family:'Golos Text',sans-serif;min-height:48px;padding:0 24px;border:1px solid #34343A;border-radius:9999px;background:transparent;color:#E7E6E2;font-size:14px;font-weight:600;cursor:pointer}.ds-btn-out:hover{background:#202024}.ds-btn-out:focus-visible{outline:2px solid #EE8A6E;outline-offset:2px}"
+    },
+    {
+      "name": "Boarding Pass",
+      "kind": "card",
+      "refersTo": "boarding-pass",
+      "description": "Signature connection card: route, perforation with semicircle notches, status, timer, pass button.",
+      "html": "<div class=\"ds-pass\"><div class=\"ds-seg ds-top\"><div><div class=\"ds-l\">ОТКУДА</div><div class=\"ds-t\">Ты</div></div><div class=\"ds-arr\">&rarr;</div><div class=\"ds-grow\"><div class=\"ds-l\">КУДА</div><div class=\"ds-t\">Хельсинки</div></div><div class=\"ds-end\"><div class=\"ds-l\">ПИНГ</div><div class=\"ds-v\">42<span>мс</span></div></div></div><div class=\"ds-seg ds-bot\"><div class=\"ds-row\"><div class=\"ds-grow\"><div class=\"ds-l\">СТАТУС</div><div class=\"ds-s\"><i></i>Подключено</div></div><div class=\"ds-end\"><div class=\"ds-l\">В ПУТИ</div><div class=\"ds-v ds-sm\">00:12:05</div></div></div><button class=\"ds-go\">Отключить</button></div></div>",
+      "css": ".ds-pass{width:340px;font-family:'Golos Text',sans-serif;color:#18181B}.ds-seg{background:#E9E7E2;padding:18px 20px 20px;-webkit-mask:radial-gradient(circle 10px at 0 var(--y),#0000 98%,#000 100%) left/51% 100% no-repeat,radial-gradient(circle 10px at 100% var(--y),#0000 98%,#000 100%) right/51% 100% no-repeat;mask:radial-gradient(circle 10px at 0 var(--y),#0000 98%,#000 100%) left/51% 100% no-repeat,radial-gradient(circle 10px at 100% var(--y),#0000 98%,#000 100%) right/51% 100% no-repeat}.ds-top{--y:100%;border-radius:18px 18px 0 0;display:flex;gap:12px}.ds-bot{--y:0%;border-radius:0 0 18px 18px;background-image:linear-gradient(90deg,#C4C2BC 6px,transparent 6px);background-size:11px 2px;background-repeat:repeat-x;background-position:16px 0}.ds-l{font-size:11px;font-weight:600;letter-spacing:.9px;line-height:14px;color:#66656B;margin-bottom:4px}.ds-t{font-size:22px;font-weight:700}.ds-arr{color:#66656B;padding-top:22px}.ds-grow{flex:1;min-width:0}.ds-end{text-align:right}.ds-v{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:24px}.ds-v span{font-size:13px;font-weight:400;color:#66656B;margin-left:2px}.ds-sm{font-size:20px}.ds-row{display:flex}.ds-s{font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}.ds-s i{width:10px;height:10px;border-radius:50%;background:#2F7D53}.ds-go{font-family:'Golos Text',sans-serif;margin-top:18px;width:100%;height:56px;border:none;border-radius:14px;background:#6FC495;color:#18181B;font-size:16px;font-weight:600;cursor:pointer}.ds-go:focus-visible{outline:2px solid #18181B;outline-offset:2px}"
+    },
+    {
+      "name": "Departure Board",
+      "kind": "custom",
+      "refersTo": "board-row",
+      "description": "One СЕРВЕР | ПИНГ header with one rule; single-line rows; changed row in coral wash; «Добавить сервер» as the last row.",
+      "html": "<div class=\"ds-board\"><div class=\"ds-bh\"><span>СЕРВЕР</span><span>ПИНГ</span></div><div class=\"ds-br ds-active\" tabindex=\"0\"><i class=\"ds-dot ds-on\"></i><span class=\"ds-name\">Хельсинки</span><span class=\"ds-ping\">42 мс</span><b>&#8942;</b></div><div class=\"ds-br ds-changed\" tabindex=\"0\"><i class=\"ds-dot\"></i><span class=\"ds-name\">Амстердам</span><span class=\"ds-ping ds-sig\">58 мс</span><b>&#8942;</b></div><div class=\"ds-br\" tabindex=\"0\"><i class=\"ds-dot\"></i><span class=\"ds-name\">Франкфурт</span><span class=\"ds-ping ds-fail\">нет связи</span><b>&#8942;</b></div><button class=\"ds-add\">+&nbsp;&nbsp;Добавить сервер</button></div>",
+      "css": ".ds-board{width:360px;background:#18181B;padding:12px 0;font-family:'Golos Text',sans-serif;color:#E7E6E2}.ds-bh{display:flex;justify-content:space-between;padding:0 56px 10px 20px;border-bottom:1px solid #34343A;font-size:11px;font-weight:600;letter-spacing:.9px;color:#9C9CA4}.ds-br{display:flex;align-items:center;min-height:56px;margin:0 8px;padding-left:12px;border-radius:14px;cursor:pointer;transition:background .4s}.ds-br:hover{background:#202024}.ds-br:focus-visible{outline:2px solid #EE8A6E}.ds-active{background:#29292E}.ds-changed{background:rgba(238,138,110,.15)}.ds-dot{width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:1.5px solid #34343A;margin-right:14px}.ds-on{background:#6FC495;border:none}.ds-name{flex:1;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ds-ping{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;margin-left:12px}.ds-sig{color:#EE8A6E}.ds-fail{color:#F07B7B}.ds-br b{width:48px;text-align:center;color:#9C9CA4;font-weight:400}.ds-add{font-family:'Golos Text',sans-serif;margin:4px 8px;min-height:48px;padding:0 12px;background:none;border:none;color:#E7E6E2;font-size:12px;font-weight:500;border-radius:9999px;cursor:pointer}.ds-add:hover{background:#202024}.ds-add:focus-visible{outline:2px solid #EE8A6E;outline-offset:2px}"
+    },
+    {
+      "name": "Top App Bar",
+      "kind": "nav",
+      "refersTo": "",
+      "description": "Ground-coloured Material top bar with the MPA wordmark; action icon turns coral when split tunnelling is on.",
+      "html": "<header class=\"ds-bar\"><span>MPA</span><b>&#9783;</b></header>",
+      "css": ".ds-bar{width:360px;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;box-sizing:border-box;background:#18181B;color:#E7E6E2}.ds-bar span{font-family:'Golos Text',sans-serif;font-size:22px;font-weight:700;letter-spacing:1px}.ds-bar b{color:#9C9CA4;font-weight:400}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Gate at Night",
+    "overview": "The app is an airport gate after dark. The ground is graphite, the server list is a departure board printed in pale ink on that graphite, and the active connection is a paper boarding pass held up against it. One object on the screen is warm and tactile (the pass); everything else is the quiet, dense, readable board. This replaces the category default of a glowing round power button on a dark gradient.\n\nThe palette was softened by the user after the first build (\"Графит + коралл\"): no pure white, no acid tones. Paper is warm matte (#E9E7E2), graphite is slightly cool. Colour carries meaning and nothing else: green means connected, coral means something changed or needs attention, red means failure. Every state also has a word (\"Подключено\", \"Не защищено\", \"Ошибка\") so colour is never the only signal.\n\nWords are set in Golos Text; every number, address and timer is set in JetBrains Mono, so ping and elapsed time read like a board's tabular figures. Density is calm: one pass, one primary button, then single-line rows.",
+    "keyCharacteristics": [
+      "Graphite board ground with one warm paper pass as the only light object.",
+      "Pass silhouette: rounded ticket, semicircle notches, dashed perforation.",
+      "Three signal colours, each with exactly one meaning.",
+      "Golos Text for words, JetBrains Mono for numbers.",
+      "Flat: depth comes from tone (ground, board, raised) and paper contrast, never shadow."
+    ],
+    "rules": [
+      {
+        "name": "The Green Means Connected Rule",
+        "body": "Green appears only when the tunnel is up. The pass button is Paper Ink with paper text for «Подключить», «Повторить», «Отменить» and «Добавить сервер»; it turns green only as «Отключить». \"Не защищено\" must never look like \"all good\".",
+        "section": "colors"
+      },
+      {
+        "name": "The Coral Is News Rule",
+        "body": "Coral marks something that changed or wants a look (re-ranked ping, in-progress work, an available update). It is never decoration and never a failure colour for the connection.",
+        "section": "colors"
+      },
+      {
+        "name": "The Red Is Failure Rule",
+        "body": "Red is reserved for failure and destructive actions: no connection, error text, «Удалить».",
+        "section": "colors"
+      },
+      {
+        "name": "The No Pure White Rule",
+        "body": "The lightest value is Warm Paper (#E9E7E2). No #FFFFFF anywhere.",
+        "section": "colors"
+      },
+      {
+        "name": "The Words and Numbers Rule",
+        "body": "Golos Text sets words; JetBrains Mono sets numbers, units next to them, addresses and timers. Never a number in Golos, never a sentence in Mono.",
+        "section": "typography"
+      },
+      {
+        "name": "The Field Label Rule",
+        "body": "Uppercase tracked labels exist only as field names on the pass and column names on the board, exactly like a printed ticket. They always label a value directly beneath or beside them.",
+        "section": "typography"
+      },
+      {
+        "name": "The Paper Is the Elevation Rule",
+        "body": "The only thing that \"comes forward\" is the paper pass, and it does so by material contrast, not by shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep the pass button Paper Ink with paper text in every state except connected; only «Отключить» is green.",
+      "**Do** set every figure (ping, timer, port, address) in JetBrains Mono, and every word in Golos Text.",
+      "**Do** keep board rows to one line; put server details in the row's overflow menu.",
+      "**Do** end the board with a «Добавить сервер» row.",
+      "**Do** pair every state colour with a word, so state never relies on colour alone.",
+      "**Do** keep touch targets at 48dp minimum and text in sp."
+    ],
+    "donts": [
+      "**Don't** use green for anything but an active connection, including success toasts or \"ready\" states.",
+      "**Don't** use coral for connection failure, or red for \"something changed\".",
+      "**Don't** use pure white (#FFFFFF) or add shadows; depth is tonal.",
+      "**Don't** add a second header row or per-group column headers to the board; one СЕРВЕР | ПИНГ header with one rule.",
+      "**Don't** show server addresses in board rows.",
+      "**Don't** reintroduce a round power button or glowing gradient as the connect control."
+    ]
+  }
+}

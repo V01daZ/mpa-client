@@ -13,6 +13,7 @@ import com.google.gson.Gson
 import dev.mpa.client.MainActivity
 import dev.mpa.client.R
 import dev.mpa.client.data.ConnectionStatus
+import dev.mpa.client.data.ProfileRepository
 import dev.mpa.client.data.ServerProfile
 import dev.mpa.client.data.SingBoxConfig
 import dev.mpa.client.data.SplitTunnelRepository
@@ -46,6 +47,9 @@ class MpaVpnService : VpnService() {
 
         private val _status = MutableStateFlow<ConnectionStatus>(ConnectionStatus.Disconnected)
         val status: StateFlow<ConnectionStatus> = _status.asStateFlow()
+
+        /** Ошибка до запуска сервиса (например, не удалось привязаться). */
+        fun reportError(message: String) { _status.value = ConnectionStatus.Error(message) }
     }
 
     inner class LocalBinder : Binder() {
@@ -60,34 +64,60 @@ class MpaVpnService : VpnService() {
     override fun onCreate() { super.onCreate(); createNotificationChannel() }
     override fun onBind(intent: Intent?): IBinder = binder
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_CONNECT -> {
-                val json = intent.getStringExtra(EXTRA_PROFILE_JSON)
-                if (json != null) {
-                    serviceScope.launch {
-                        try {
-                            val profile = Gson().fromJson(json, ServerProfile::class.java)
-                            val splitTunnel = SplitTunnelRepository(applicationContext).settingsFlow.first()
-                            connect(profile, splitTunnel)
-                        } catch (e: Exception) {
-                            android.util.Log.e("MpaVpnService", "Intent connect error: ${e.message}")
-                        }
+        if (intent?.action == ACTION_DISCONNECT) {
+            disconnect()
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        // Сервис стартует через startForegroundService: startForeground обязан прозвучать
+        // в течение нескольких секунд при ЛЮБОМ исходе, иначе система убивает приложение (ANR).
+        if (!_status.value.isConnected) {
+            startForeground(NOTIF_ID, buildNotification("", connected = false))
+        }
+
+        if (intent?.action == ACTION_CONNECT) {
+            serviceScope.launch {
+                try {
+                    val profile = intent.getStringExtra(EXTRA_PROFILE_JSON)
+                        ?.let { Gson().fromJson(it, ServerProfile::class.java) }
+                        ?: activeProfile()  // автозапуск: берём выбранный сервер
+                    if (profile == null || prepare(this@MpaVpnService) != null) {
+                        // Нет сервера или разрешения VPN — тихо выходим
+                        stopIdle()
+                        return@launch
                     }
+                    val splitTunnel = SplitTunnelRepository(applicationContext).settingsFlow.first()
+                    connect(profile, splitTunnel)
+                    if (!_status.value.isConnected) stopIdle()
+                } catch (e: Exception) {
+                    android.util.Log.e("MpaVpnService", "Intent connect error: ${e.message}")
+                    stopIdle()
                 }
-            }
-            ACTION_DISCONNECT -> {
-                disconnect()
-                stopSelf()
             }
         }
         return START_NOT_STICKY
     }
+
+    private suspend fun activeProfile(): ServerProfile? {
+        val repo = ProfileRepository(applicationContext)
+        val id = repo.getActiveProfileId()
+        return repo.getProfiles().let { list -> list.find { it.id == id } ?: list.firstOrNull() }
+    }
+
+    /** Убрать уведомление «подключается» и остановиться, если не подключены. */
+    private fun stopIdle() {
+        if (_status.value.isConnected) return
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
     override fun onDestroy() {
         serviceScope.cancel()
         disconnect()
         super.onDestroy()
     }
-    override fun onRevoke()  { disconnect() }
+    override fun onRevoke()  { disconnect(); stopSelf() }
 
     // ── Public API ─────────────────────────────────────────────────────────
 
@@ -108,6 +138,11 @@ class MpaVpnService : VpnService() {
             _status.value = ConnectionStatus.Connected(profile.id)
         } catch (e: Exception) {
             android.util.Log.e("MpaVpnService", "connect error: ${e.message}", e)
+            // Без этого TUN-интерфейс оставался открытым и трафик уходил в никуда
+            try { boxService?.close() } catch (_: Exception) {}
+            boxService = null
+            closeTun()
+            stopForeground(STOP_FOREGROUND_REMOVE)
             _status.value = ConnectionStatus.Error(e.message ?: "Ошибка sing-box")
         }
     }
@@ -121,12 +156,17 @@ class MpaVpnService : VpnService() {
         _status.value = ConnectionStatus.Disconnecting(prev)
         try { boxService?.close() } catch (_: Exception) {}
         boxService = null
-        tunFd = -1
+        closeTun()
         stopForeground(STOP_FOREGROUND_REMOVE)
         _status.value = ConnectionStatus.Disconnected
     }
 
     // ── TUN ────────────────────────────────────────────────────────────────
+
+    private fun closeTun() {
+        if (tunFd >= 0) runCatching { android.os.ParcelFileDescriptor.adoptFd(tunFd).close() }
+        tunFd = -1
+    }
 
     private fun buildTunInterface(splitTunnel: SplitTunnelSettings): Int {
         val builder = Builder()
@@ -141,20 +181,17 @@ class MpaVpnService : VpnService() {
             )
             .addDnsServer("1.1.1.1")
             .setMtu(9000)
-            // Само приложение всегда мимо TUN
-            .addDisallowedApplication(packageName)
 
-        // Split tunnel
-        if (splitTunnel.enabled && splitTunnel.packageNames.isNotEmpty()) {
-            if (splitTunnel.whitelistMode) {
-                // Белый список: только выбранные приложения идут через VPN
-                // Все остальные — напрямую (addDisallowedApplication для всего кроме выбранных)
-                val allPackages = packageManager.getInstalledApplications(0)
-                    .map { it.packageName }
-                    .filter { it != packageName }
-                val bypass = allPackages.toSet() - splitTunnel.packageNames
-                bypass.forEach { runCatching { builder.addDisallowedApplication(it) } }
-            } else {
+        // Allowed и Disallowed в одном Builder смешивать нельзя (UnsupportedOperationException).
+        if (splitTunnel.enabled && splitTunnel.whitelistMode && splitTunnel.packageNames.isNotEmpty()) {
+            // Белый список: через VPN только выбранные; MPA в список не входит и идёт напрямую
+            splitTunnel.packageNames
+                .filter { it != packageName }
+                .forEach { runCatching { builder.addAllowedApplication(it) } }
+        } else {
+            // Само приложение всегда мимо TUN
+            builder.addDisallowedApplication(packageName)
+            if (splitTunnel.enabled) {
                 // Чёрный список: выбранные приложения идут напрямую (bypass VPN)
                 splitTunnel.packageNames.forEach { runCatching { builder.addDisallowedApplication(it) } }
             }

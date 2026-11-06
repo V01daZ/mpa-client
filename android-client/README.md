@@ -11,10 +11,10 @@ Supports VLESS + XTLS-Vision + Reality — the same protocol as the desktop clie
 - VLESS + Reality + uTLS — full support
 - Three input formats: `vless://` link, subscription URL, activation key
 - Automatic hourly subscription refresh (WorkManager)
-- Dark theme — same palette as the desktop client (#12161C / #E8A33D copper / #5FBF9F teal)
-- Space Grotesk + JetBrains Mono fonts
-- Animated background
-- Per-server TCP ping
+- "Boarding pass" UI: the connection is a ticket (server, ping, status, session time), servers are a departure board sorted by ping
+- Golos Text + JetBrains Mono fonts (bundled in `res/font`, SIL OFL)
+- Per-server TCP ping; servers whose ping changed noticeably are highlighted
+- Split tunnelling per app (bypass list or "only these apps")
 - Foreground VPN service with quick-disconnect notification
 - Auto-start on boot
 
@@ -50,18 +50,23 @@ go install golang.org/x/mobile/cmd/gomobile@latest
 go install golang.org/x/mobile/cmd/gobind@latest
 gomobile init
 
-# Clone sing-box
-git clone https://github.com/SagerNet/sing-box
+# Clone sing-box v1.9.7: the app is written against this libbox API
+# (4-arg Libbox.setup, PlatformInterface without SendNotification).
+# 1.10+ changed both and the app will not compile against it.
+git clone --depth 1 --branch v1.9.7 https://github.com/SagerNet/sing-box
 cd sing-box
 
 # Build libbox with all tags needed for VLESS+Reality+uTLS
 gomobile bind -v \
   -androidapi 21 \
-  -target android/arm64,android/arm,android/amd64,android/386 \
+  -target android/arm64,android/arm,android/amd64 \
   -tags "with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_reality_server,with_clash_api" \
+  -ldflags "-s -w -checklinkname=0" \
   -o libbox.aar \
-  github.com/sagernet/sing-box/experimental/libbox
+  ./experimental/libbox
 ```
+
+> `-checklinkname=0` is required with Go 1.23+ (old dependencies use `go:linkname`). Verified with Go 1.26 and NDK 27.
 
 > **Important:** The `with_utls` and `with_gvisor` tags are required. Without `with_utls` — Reality won't work. Without `with_gvisor` — the TUN stack won't start.
 
@@ -74,19 +79,10 @@ app/libs/libbox-sources.jar   # optional, for IDE sources
 
 ---
 
-### Step 2 — Add fonts
+### Step 2 — Fonts
 
-Download and place TTF files in `app/src/main/res/font/`:
-
-| File | Source |
-|---|---|
-| `space_grotesk_regular.ttf` | [Google Fonts — Space Grotesk](https://fonts.google.com/specimen/Space+Grotesk) |
-| `space_grotesk_medium.ttf` | same |
-| `space_grotesk_semibold.ttf` | same |
-| `space_grotesk_bold.ttf` | same |
-| `jetbrains_mono_regular.ttf` | [JetBrains Mono](https://www.jetbrains.com/legalnotices/font/) |
-
-Both fonts are free and open-source (SIL Open Font License).
+Fonts are already in the repo (`app/src/main/res/font/`, variable TTFs, SIL Open Font License):
+[Golos Text](https://fonts.google.com/specimen/Golos+Text) and [JetBrains Mono](https://www.jetbrains.com/lp/mono/). Nothing to download.
 
 ---
 

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Тематическая иконка Android 13+: силуэт талона, M и огонёк вырезаны -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+        android:pathData="M30,34 H58 A4,4 0 0,0 66,34 H78 A4,4 0 0,1 82,38 V70 A4,4 0 0,1 78,74 H66 A4,4 0 0,0 58,74 H30 A4,4 0 0,1 26,70 V38 A4,4 0 0,1 30,34 Z M33,64 L33,44 L38,44 L44,53 L50,44 L55,44 L55,64 L50,64 L50,53 L44,61.5 L38,53 L38,64 Z M61.2,40h1.6v3h-1.6z M61.2,45.5h1.6v3h-1.6z M61.2,51h1.6v3h-1.6z M61.2,56.5h1.6v3h-1.6z M61.2,62h1.6v3h-1.6z M72,54 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
+</vector>

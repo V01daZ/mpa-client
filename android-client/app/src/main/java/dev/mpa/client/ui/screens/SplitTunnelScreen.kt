@@ -1,36 +1,42 @@
 package dev.mpa.client.ui.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,25 +44,42 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.mpa.client.data.AppInfo
 import dev.mpa.client.data.SplitTunnelSettings
-import dev.mpa.client.ui.theme.Accent
-import dev.mpa.client.ui.theme.AccentSoft
-import dev.mpa.client.ui.theme.Border
-import dev.mpa.client.ui.theme.Connected
-import dev.mpa.client.ui.theme.ConnectedSoft
-import dev.mpa.client.ui.theme.Ink
-import dev.mpa.client.ui.theme.SpaceGroteskFamily
-import dev.mpa.client.ui.theme.Surface
-import dev.mpa.client.ui.theme.SurfaceHover
-import dev.mpa.client.ui.theme.TextMuted
-import dev.mpa.client.ui.theme.TextPrimary
+import dev.mpa.client.ui.theme.Board
+import dev.mpa.client.ui.theme.BoardRaised
+import dev.mpa.client.ui.theme.Ground
+import dev.mpa.client.ui.theme.MonoData
+import dev.mpa.client.ui.theme.OnBoard
+import dev.mpa.client.ui.theme.OnBoardMuted
+import dev.mpa.client.ui.theme.Paper
+import dev.mpa.client.ui.theme.PaperInk
+import dev.mpa.client.ui.theme.Rule
+import dev.mpa.client.ui.theme.Signal
 
+/** Иконка приложения: грузится в фоне, пока нет — пустое место того же размера. */
+@Composable
+private fun AppIcon(packageName: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val icon by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, packageName) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                context.packageManager.getApplicationIcon(packageName)
+                    .toBitmap(96, 96)
+                    .asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    val m = Modifier.size(40.dp)
+    icon?.let { androidx.compose.foundation.Image(it, contentDescription = null, modifier = m) }
+        ?: Box(m)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SplitTunnelScreen(
     settings: SplitTunnelSettings,
@@ -64,292 +87,165 @@ fun SplitTunnelScreen(
     onSettingsChange: (SplitTunnelSettings) -> Unit,
     onBack: () -> Unit,
 ) {
-    var searchQuery by remember { mutableStateOf("") }
-
-    val filteredApps = remember(apps, searchQuery) {
-        if (searchQuery.isBlank()) apps
-        else apps.filter {
-            it.label.contains(searchQuery, ignoreCase = true) ||
-            it.packageName.contains(searchQuery, ignoreCase = true)
-        }
+    var query by remember { mutableStateOf("") }
+    // Отмеченные при открытии — сверху; во время выбора список не прыгает
+    val pinned = remember { settings.packageNames }
+    val filtered = remember(apps, query) {
+        apps.filter {
+            query.isBlank() || it.label.contains(query, true) || it.packageName.contains(query, true)
+        }.sortedByDescending { it.packageName in pinned }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Ink)
-    ) {
-        // ── Header ─────────────────────────────────────────────────────────
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 8.dp)
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Назад", tint = TextPrimary)
-            }
-            Text(
-                text = "Выбор приложений",
-                color = TextPrimary,
-                fontFamily = SpaceGroteskFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
-                modifier = Modifier.padding(start = 4.dp)
-            )
-        }
-
-        // ── Enabled toggle ─────────────────────────────────────────────────
-        Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Surface)
-                .padding(horizontal = 20.dp, vertical = 14.dp)
-        ) {
-            Column {
-                Text(
-                    text = "Раздельный туннель",
-                    color = TextPrimary,
-                    fontFamily = SpaceGroteskFamily,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp,
-                )
-                Text(
-                    text = "Какие приложения используют VPN",
-                    color = TextMuted,
-                    fontSize = 12.sp,
-                )
-            }
-            Switch(
-                checked = settings.enabled,
-                onCheckedChange = { onSettingsChange(settings.copy(enabled = it)) },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Ink,
-                    checkedTrackColor = Accent,
-                    uncheckedThumbColor = TextMuted,
-                    uncheckedTrackColor = Border,
-                )
-            )
-        }
-
-        HorizontalDivider(color = Border)
-
-        if (settings.enabled) {
-            // ── Mode selector ───────────────────────────────────────────────
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Surface)
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
-            ) {
-                Text(
-                    text = "РЕЖИМ",
-                    color = TextMuted,
-                    fontFamily = SpaceGroteskFamily,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 10.sp,
-                    letterSpacing = 0.1.sp,
-                )
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    ModeChip(
-                        label = "Чёрный список",
-                        subtitle = "Выбранные - напрямую",
-                        selected = !settings.whitelistMode,
-                        onClick = { onSettingsChange(settings.copy(whitelistMode = false)) },
-                        modifier = Modifier.weight(1f)
-                    )
-                    ModeChip(
-                        label = "Белый список",
-                        subtitle = "Выбранные - через VPN",
-                        selected = settings.whitelistMode,
-                        onClick = { onSettingsChange(settings.copy(whitelistMode = true)) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Spacer(Modifier.height(8.dp))
-                val hint = if (settings.whitelistMode)
-                    "Только отмеченные приложения идут через VPN, остальные — напрямую"
-                else
-                    "Отмеченные приложения обходят VPN и идут напрямую"
-                Text(text = hint, color = TextMuted, fontSize = 11.sp, lineHeight = 16.sp)
-            }
-
-            HorizontalDivider(color = Border)
-
-            // ── Search ──────────────────────────────────────────────────────
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("Поиск приложений...", color = TextMuted, fontSize = 13.sp) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextMuted) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Accent,
-                    unfocusedBorderColor = Border,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary,
-                    cursorColor = Accent,
-                    focusedContainerColor = Surface,
-                    unfocusedContainerColor = Surface,
+    Scaffold(
+        containerColor = Ground,
+        topBar = {
+            TopAppBar(
+                title = { Text("Приложения") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Ground, titleContentColor = OnBoard, navigationIconContentColor = OnBoard,
                 ),
-                singleLine = true,
-                shape = RoundedCornerShape(0.dp),
-                modifier = Modifier.fillMaxWidth()
             )
-
-            val selectedCount = settings.packageNames.size
-            if (selectedCount > 0) {
-                Text(
-                    text = "Выбрано: $selectedCount",
-                    color = Accent,
-                    fontFamily = SpaceGroteskFamily,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 11.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(AccentSoft)
-                        .padding(horizontal = 20.dp, vertical = 6.dp)
+        },
+    ) { inner ->
+        LazyColumn(
+            contentPadding = PaddingValues(top = inner.calculateTopPadding(), bottom = inner.calculateBottomPadding() + 24.dp),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            item(key = "toggle") {
+                ListItem(
+                    headlineContent = { Text("Выбирать приложения") },
+                    supportingContent = { Text("По умолчанию через VPN идёт всё") },
+                    trailingContent = {
+                        Switch(
+                            checked = settings.enabled,
+                            onCheckedChange = null,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = PaperInk, checkedTrackColor = Paper,
+                                uncheckedThumbColor = OnBoardMuted, uncheckedTrackColor = Board, uncheckedBorderColor = Rule,
+                            ),
+                        )
+                    },
+                    colors = ListItemDefaults.colors(
+                        containerColor = Ground, headlineColor = OnBoard, supportingColor = OnBoardMuted,
+                    ),
+                    modifier = Modifier.clickable(role = Role.Switch) {
+                        onSettingsChange(settings.copy(enabled = !settings.enabled))
+                    },
                 )
             }
 
-            // ── App list ────────────────────────────────────────────────────
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(filteredApps, key = { it.packageName }) { app ->
-                    val isSelected = app.packageName in settings.packageNames
-                    AppRow(
-                        app = app,
-                        isSelected = isSelected,
-                        onClick = {
-                            val updated = if (isSelected)
-                                settings.packageNames - app.packageName
-                            else
-                                settings.packageNames + app.packageName
-                            onSettingsChange(settings.copy(packageNames = updated))
-                        }
+            if (!settings.enabled) {
+                item(key = "off") {
+                    Text(
+                        "Включи, чтобы выбрать, какие приложения пускать мимо VPN или только через него.",
+                        color = OnBoardMuted,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Start,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     )
-                    HorizontalDivider(color = Border.copy(alpha = 0.4f))
+                }
+                return@LazyColumn
+            }
+
+            item(key = "mode") {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    val modes = listOf(false to "Мимо VPN", true to "Только через VPN")
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        modes.forEachIndexed { i, (whitelist, label) ->
+                            SegmentedButton(
+                                selected = settings.whitelistMode == whitelist,
+                                onClick = { onSettingsChange(settings.copy(whitelistMode = whitelist)) },
+                                shape = SegmentedButtonDefaults.itemShape(i, modes.size),
+                                colors = SegmentedButtonDefaults.colors(
+                                    activeContainerColor = Paper, activeContentColor = PaperInk,
+                                    inactiveContainerColor = Ground, inactiveContentColor = OnBoard,
+                                    activeBorderColor = Paper, inactiveBorderColor = Rule,
+                                ),
+                            ) { Text(label) }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        if (settings.whitelistMode) "Через VPN пойдут только отмеченные приложения. Остальные — напрямую."
+                        else "Отмеченные приложения пойдут напрямую. Остальные — через VPN.",
+                        color = OnBoardMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             }
-        } else {
-            // Плейсхолдер когда выключено
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Включи раздельный туннель чтобы\nвыбрать приложения",
-                    color = TextMuted,
-                    fontSize = 14.sp,
-                    lineHeight = 22.sp,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+
+            item(key = "search") {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = { Text("Найти приложение") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Paper, unfocusedBorderColor = Rule, cursorColor = Paper,
+                        focusedContainerColor = Board, unfocusedContainerColor = Board,
+                    ),
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
-        }
-    }
-}
 
-@Composable
-private fun ModeChip(
-    label: String,
-    subtitle: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) AccentSoft else Ink)
-            .border(1.dp, if (selected) Accent else Border, RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(10.dp)
-    ) {
-        Text(
-            text = label,
-            color = if (selected) Accent else TextPrimary,
-            fontFamily = SpaceGroteskFamily,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
-        )
-        Text(
-            text = subtitle,
-            color = TextMuted,
-            fontSize = 11.sp,
-        )
-    }
-}
+            if (settings.packageNames.isNotEmpty()) {
+                item(key = "count") {
+                    Text(
+                        "Отмечено: ${settings.packageNames.size}",
+                        color = Signal,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
+            }
 
-@Composable
-private fun AppRow(
-    app: AppInfo,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(if (isSelected) ConnectedSoft.copy(alpha = 0.3f) else Ink)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp)
-    ) {
-        // Чекбокс
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(22.dp)
-                .clip(CircleShape)
-                .background(if (isSelected) Connected else Border.copy(alpha = 0.3f))
-                .border(1.dp, if (isSelected) Connected else Border, CircleShape)
-        ) {
-            if (isSelected) {
-                Icon(
-                    Icons.Default.Check,
-                    contentDescription = null,
-                    tint = Ink,
-                    modifier = Modifier.size(14.dp)
+            if (apps.isEmpty()) {
+                item(key = "loading") {
+                    Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Paper)
+                    }
+                }
+            } else if (filtered.isEmpty()) {
+                item(key = "nothing") {
+                    Text(
+                        "Ничего не нашлось по «$query»",
+                        color = OnBoardMuted,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+            }
+
+            items(filtered, key = { it.packageName }) { app ->
+                val checked = app.packageName in settings.packageNames
+                ListItem(
+                    headlineContent = { Text(app.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    leadingContent = { AppIcon(app.packageName) },
+                    trailingContent = {
+                        Checkbox(
+                            checked = checked,
+                            onCheckedChange = null,
+                            colors = CheckboxDefaults.colors(checkedColor = Paper, checkmarkColor = PaperInk, uncheckedColor = OnBoardMuted),
+                        )
+                    },
+                    colors = ListItemDefaults.colors(
+                        containerColor = if (checked) BoardRaised else Ground,
+                        headlineColor = OnBoard, supportingColor = OnBoardMuted, overlineColor = OnBoardMuted,
+                    ),
+                    modifier = Modifier.animateItem().clickable(role = Role.Checkbox) {
+                        val updated = if (checked) settings.packageNames - app.packageName
+                        else settings.packageNames + app.packageName
+                        onSettingsChange(settings.copy(packageNames = updated))
+                    },
                 )
             }
-        }
-
-        Spacer(Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = app.label,
-                color = TextPrimary,
-                fontFamily = SpaceGroteskFamily,
-                fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = app.packageName,
-                color = TextMuted,
-                fontSize = 11.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-
-        if (app.isSystem) {
-            Text(
-                text = "система",
-                color = TextMuted,
-                fontSize = 10.sp,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(SurfaceHover)
-                    .padding(horizontal = 5.dp, vertical = 2.dp)
-            )
         }
     }
 }

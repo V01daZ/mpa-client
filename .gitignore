@@ -39,3 +39,9 @@ yarn.lock
 /playwright/.cache/
 
 test/screenshots
+
+# Impeccable: рабочие файлы дизайн-сессий
+.impeccable/mocks/
+.impeccable/questions/
+.impeccable/review/
+.impeccable/payload.json
