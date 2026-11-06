@@ -50,18 +50,23 @@ go install golang.org/x/mobile/cmd/gomobile@latest
 go install golang.org/x/mobile/cmd/gobind@latest
 gomobile init
 
-# Clone sing-box
-git clone https://github.com/SagerNet/sing-box
+# Clone sing-box v1.9.7: the app is written against this libbox API
+# (4-arg Libbox.setup, PlatformInterface without SendNotification).
+# 1.10+ changed both and the app will not compile against it.
+git clone --depth 1 --branch v1.9.7 https://github.com/SagerNet/sing-box
 cd sing-box
 
 # Build libbox with all tags needed for VLESS+Reality+uTLS
 gomobile bind -v \
   -androidapi 21 \
-  -target android/arm64,android/arm,android/amd64,android/386 \
+  -target android/arm64,android/arm,android/amd64 \
   -tags "with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_reality_server,with_clash_api" \
+  -ldflags "-s -w -checklinkname=0" \
   -o libbox.aar \
-  github.com/sagernet/sing-box/experimental/libbox
+  ./experimental/libbox
 ```
+
+> `-checklinkname=0` is required with Go 1.23+ (old dependencies use `go:linkname`). Verified with Go 1.26 and NDK 27.
 
 > **Important:** The `with_utls` and `with_gvisor` tags are required. Without `with_utls` — Reality won't work. Without `with_gvisor` — the TUN stack won't start.
 
