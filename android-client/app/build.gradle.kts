@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -12,8 +14,8 @@ android {
         applicationId = "dev.mpa.client"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.5.1"
+        versionCode = 5
+        versionName = "1.6.0"
 
         val activationApi = project.findProperty("MPA_ACTIVATION_API")?.toString()
             ?: System.getenv("MPA_ACTIVATION_API")
@@ -27,8 +29,29 @@ android {
         }
     }
 
+    // Ключ подписи берётся из android-client/keystore.properties (в .gitignore):
+    //   storeFile=C:/path/to/key.jks
+    //   storePassword=...
+    //   keyAlias=...
+    //   keyPassword=...
+    // Обновления ставятся поверх старой версии, только если ключ тот же, что у прошлых релизов.
+    val keystoreProps = rootProject.file("keystore.properties").takeIf { it.exists() }
+        ?.let { f -> Properties().apply { f.inputStream().use { load(it) } } }
+
+    signingConfigs {
+        if (keystoreProps != null) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
